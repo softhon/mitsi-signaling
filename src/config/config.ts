@@ -8,7 +8,10 @@ const keyPath = path.join(__dirname, '..', 'certs', 'privkey.pem');
 
 const config = {
   env: process.env.NODE_ENV,
-
+  cors: {
+    origin: process.env.NODE_ENV === 'production' ? ['https://mitsi.app'] : '*',
+    methods: ['GET', 'POST'],
+  },
   https: {
     listenIp: '0.0.0.0',
     listenPort: process.env.SERVER_LISTEN_PORT || 8000,
