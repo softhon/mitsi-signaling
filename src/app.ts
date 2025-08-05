@@ -34,7 +34,7 @@ class App {
     this.app.get('/', (_req: Request, res: Response) => {
       return res
         .status(HTTPSTATUS.OK)
-        .send('<h1>Colloquium Signalling Server Running</h1>');
+        .send('<h1>Mitsi Signaling Service Running</h1>');
     });
     // Health check
     this.app.get('/health', (_req: Request, res: Response) => {
