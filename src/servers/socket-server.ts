@@ -24,14 +24,14 @@ export default class SocketServer {
   static init(app: express.Application) {
     try {
       // Create https and socket io server
-      const httpsServer = https.createServer(serverOption, app);
-      const ioServer = new Server(httpsServer, {
+      this.https = https.createServer(serverOption, app);
+      this.io = new Server(this.https, {
         cors: corsOption,
         adapter: createAdapter(RedisServer.client!),
       });
 
       // Connection Authentication middleware
-      ioServer.use(async (socket, next) => {
+      this.io.use(async (socket, next) => {
         try {
           const { key } = socket.handshake.auth;
           if (!key) {
@@ -47,7 +47,7 @@ export default class SocketServer {
       });
 
       // Handle client connections
-      ioServer.on('connection', socket => {
+      this.io.on('connection', socket => {
         const { roomId } = socket.handshake.query;
         if (!roomId) {
           console.warn(`Client disconnected due to missing meetingId`);
@@ -69,11 +69,7 @@ export default class SocketServer {
         });
       });
 
-      // Assign the server instances
-      SocketServer.https = httpsServer;
-      SocketServer.io = ioServer;
-
-      console.info('Signaling server initialized and ready.');
+      console.info('Socket server initialized succesfully.');
     } catch (error) {
       console.error('Error initializing Signaller', { error });
       throw error; // Rethrow the error to handle gracefully in the calling context
