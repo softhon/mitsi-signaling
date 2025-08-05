@@ -12,21 +12,19 @@ export const serverOption = {
   cert: fs.readFileSync(config.https.tls.cert, 'utf8'),
 };
 
-export const corsOption = {
-  origin: config.env === 'production' ? ['https://mitsi.app'] : '*',
-  methods: ['GET', 'POST'],
-};
-
 export default class SocketServer {
   static https: https.Server;
   static io: Server;
 
   static init(app: express.Application) {
     try {
+      if (!RedisServer.client) {
+        throw new Error('Redis client not initialized');
+      }
       // Create https and socket io server
       this.https = https.createServer(serverOption, app);
       this.io = new Server(this.https, {
-        cors: corsOption,
+        cors: config.cors,
         adapter: createAdapter(RedisServer.client!),
       });
 
