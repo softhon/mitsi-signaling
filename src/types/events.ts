@@ -7,3 +7,7 @@ export enum SignallingEvents {
 export enum PubSubEvents {
   'EndMeeting' = 'end-meeting',
 }
+
+export enum ServiceEvents {
+  Close = 'close',
+}
