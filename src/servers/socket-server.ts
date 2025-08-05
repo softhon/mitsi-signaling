@@ -1,0 +1,82 @@
+import fs from 'fs';
+import https from 'https';
+import express from 'express';
+import { Server } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-streams-adapter';
+
+import config from '../config/config';
+import RedisServer from './redis-server';
+
+export const serverOption = {
+  key: fs.readFileSync(config.https.tls.key, 'utf8'),
+  cert: fs.readFileSync(config.https.tls.cert, 'utf8'),
+};
+
+export const corsOption = {
+  origin: config.env === 'production' ? ['https://mitsi.app'] : '*',
+  methods: ['GET', 'POST'],
+};
+
+export default class SocketServer {
+  static https: https.Server;
+  static io: Server;
+
+  static init(app: express.Application) {
+    try {
+      // Create https and socket io server
+      const httpsServer = https.createServer(serverOption, app);
+      const ioServer = new Server(httpsServer, {
+        cors: corsOption,
+        adapter: createAdapter(RedisServer.client!),
+      });
+
+      // Connection Authentication middleware
+      ioServer.use(async (socket, next) => {
+        try {
+          const { key } = socket.handshake.auth;
+          if (!key) {
+            return next(new Error('Authentication key is missing.'));
+          }
+          // TODO: implement api key verification
+
+          next();
+        } catch (error) {
+          console.error(error);
+          next(new Error('Authentication failed'));
+        }
+      });
+
+      // Handle client connections
+      ioServer.on('connection', socket => {
+        const { roomId } = socket.handshake.query;
+        if (!roomId) {
+          console.warn(`Client disconnected due to missing meetingId`);
+          socket.disconnect(true);
+          return;
+        }
+
+        // new ClientNode(socket);
+
+        socket.on('error', err => {
+          console.error(`Socket error for client ${socket.id}:`, {
+            error: err,
+          });
+        });
+
+        socket.on('disconnect', reason => {
+          console.info(`Client disconnected: ${socket.id}, Reason: ${reason}`);
+          // clientNode.cleanup();
+        });
+      });
+
+      // Assign the server instances
+      SocketServer.https = httpsServer;
+      SocketServer.io = ioServer;
+
+      console.info('Signaling server initialized and ready.');
+    } catch (error) {
+      console.error('Error initializing Signaller', { error });
+      throw error; // Rethrow the error to handle gracefully in the calling context
+    }
+  }
+}
