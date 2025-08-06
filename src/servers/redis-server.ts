@@ -1,74 +1,46 @@
 import { createClient, RedisClientType } from 'redis';
+
 import { PubSubEvents } from '../types/events';
 import config from '../config/config';
 
 class RedisServer {
-  static client: RedisClientType | null = null;
-  static subscriber: RedisClientType | null = null;
+  private static instance: RedisServer | null = null;
+  private pubClient: RedisClientType;
+  private subClient: RedisClientType;
+  private isConnected: boolean = false;
 
-  static async init(): Promise<void> {
+  private constructor() {
+    this.pubClient = createClient({ url: config.redisServerUrl });
+    this.subClient = this.pubClient.duplicate();
+  }
+
+  static getInstance() {
+    if (!RedisServer.instance) {
+      RedisServer.instance = new RedisServer();
+    }
+    return RedisServer.instance;
+  }
+
+  async connect() {
+    if (this.isConnected) {
+      console.log('Redis clients already connected');
+      return;
+    }
     try {
-      if (this.client) {
-        console.warn('Redis client is already initialized.');
-        return;
-      }
-
-      // Initialize the Redis client
-      this.client = createClient({
-        url: config.redisServerUrl,
-      });
-
-      // Duplicate the client for subscriber
-      this.subscriber = this.client.duplicate();
-
-      this.client.on('connect', () => console.info('Redis client connected.'));
-      this.client.on('error', err =>
-        console.error('Redis Client Error', { error: err })
-      );
-
-      this.subscriber.on('connect', () =>
-        console.info('Redis subscriber connected.')
-      );
-      this.subscriber.on('error', err =>
-        console.error('Redis Subscriber Error', { error: err })
-      );
-
-      await Promise.all([this.client.connect(), this.subscriber.connect()]);
-
-      this.subscribe();
-
-      console.info('Redis server initialized successfully.');
+      await Promise.all([this.pubClient.connect(), this.subClient.connect()]);
+      this.isConnected = true;
+      await this.subscribe();
+      console.log('redis connected');
     } catch (error) {
-      console.error('Failed to initialize Redis client.', { error });
-      throw error; // Rethrow the error to be handled in the application
+      console.error(error);
+      throw error;
     }
   }
 
-  // Publish a message to a specific channel
-  static async publish({
-    event,
-    args,
-  }: {
-    event: PubSubEvents;
-    args: { [key: string]: unknown };
-  }) {
-    if (!this.client) {
-      throw new Error('Redis client not initialized.');
-    }
-    const message = JSON.stringify({ event, args });
-
-    await this.client.publish('message', message);
-    console.info(`Message published to channe ${message}`);
-  }
-
-  // Subscribe to a specific channel and handle incoming messages
-  static async subscribe() {
-    if (!this.subscriber) {
-      throw new Error('Redis subscriber not initialized.');
-    }
-
-    await this.subscriber.subscribe('message', message => {
-      console.info(`Message received on channel : ${message}`);
+  private async subscribe() {
+    if (!this.isConnected)
+      throw new Error('Redis clients are not connected. Call connect() first');
+    await this.subClient.subscribe(PubSubEvents.Message, message => {
       const {
         event,
         args,
@@ -77,45 +49,53 @@ class RedisServer {
         args: { [key: string]: unknown };
       } = JSON.parse(message);
 
-      console.log({ event, args });
+      console.log(event, args);
 
       // const handler = PubSubHandler[event];
 
       // handler && handler(args);
-      // handler(message);
     });
   }
 
-  // Unsubscribe from a channel
-  static async unsubscribe(channel: string) {
-    if (!this.subscriber) {
-      throw new Error('Redis subscriber not initialized.');
-    }
+  async publish({
+    event,
+    args,
+  }: {
+    event: PubSubEvents;
+    args: { [key: string]: unknown };
+  }) {
+    if (!this.isConnected)
+      throw new Error('Redis clients are not connected. Call connect() first');
 
-    await this.subscriber.unsubscribe(channel);
-    console.info(`Unsubscribed from channel "${channel}"`);
+    const message = JSON.stringify({ event, args });
+    await this.pubClient.publish(PubSubEvents.Message, message);
+    console.info(`Message published to channe ${message}`);
   }
-  /**
-   * Safely close the Redis client connection.
-   */
-  static async disconnect(): Promise<void> {
-    if (this.client) {
-      try {
-        if (this.subscriber) {
-          await this.subscriber.quit();
-        }
-        if (this.client) {
-          await this.client.quit();
-        }
-        console.log('Redis client closed successfully');
-      } catch (error) {
-        console.error('Error while closing Redis client.', { error });
-      } finally {
-        this.subscriber = null;
-        this.client = null;
-      }
+
+  getPubClient() {
+    if (!this.isConnected) console.log('Redis Not connected');
+    return this.pubClient;
+  }
+  getSubClient() {
+    return this.subClient;
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.isConnected) {
+      await Promise.all([this.pubClient.quit(), this.subClient.quit()]);
+      RedisServer.instance = null;
+      this.isConnected = false;
+      console.log('Redis clients disconnected');
     }
+  }
+
+  async unsubscribe(channel: string) {
+    if (!this.isConnected)
+      throw new Error('Redis clients are not connected. Call connect() first');
+
+    await this.subClient.unsubscribe(channel);
+    console.log(`Unsubscribed from channel "${channel}"`);
   }
 }
 
-export default RedisServer;
+export const redisServer = RedisServer.getInstance();
