@@ -1,9 +1,9 @@
 import { Socket } from 'socket.io';
 import { HandState, PeerData, Role, Tag } from '../types/interfaces';
-import ServiceBase from './servicebase';
+import Base from './base';
 import { HEARTBEAT_TIMEOUT } from '../utils/contants';
 
-class Peer extends ServiceBase {
+class Peer extends Base {
   isRecorder: boolean;
   reconnecting?: boolean;
   data: PeerData;

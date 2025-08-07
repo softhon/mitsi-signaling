@@ -3,7 +3,7 @@ import { Socket } from 'socket.io';
 import { MessageData } from '../types/interfaces';
 import { SignallingEvents } from '../types/events';
 
-abstract class ServiceBase extends EventEmitter {
+abstract class Base extends EventEmitter {
   roomId: string;
   peerId: string;
   connection: Socket;
@@ -53,4 +53,4 @@ abstract class ServiceBase extends EventEmitter {
   }
 }
 
-export default ServiceBase;
+export default Base;

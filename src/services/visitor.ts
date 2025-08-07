@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
-import ServiceBase from './servicebase';
+import Base from './base';
 
-class Visitor extends ServiceBase {
+class Visitor extends Base {
   constructor({
     roomId,
     peerId,
