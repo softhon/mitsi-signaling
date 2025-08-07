@@ -22,16 +22,11 @@ app.use('/', Routes);
 
 const httpsServer = createServer(serverOption, app);
 
-// Initialize Redis and Socket.IO
 (async (): Promise<void> => {
   try {
-    // Connect Redis
     await redisServer.connect();
-
-    // Initialize SocketServer
     SocketServer.getInstance(httpsServer);
 
-    // Start HTTPS server
     httpsServer.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });
