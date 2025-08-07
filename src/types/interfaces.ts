@@ -34,6 +34,11 @@ export enum HTTPSTATUS {
   INTERNAL_SERVER_ERROR = 500,
 }
 
+export interface HandState {
+  raised: boolean;
+  timestamp?: number;
+}
+
 export interface MessageData {
   event: string;
   args: unknown;
