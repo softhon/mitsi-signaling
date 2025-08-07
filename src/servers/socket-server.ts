@@ -4,7 +4,7 @@ import { createAdapter } from '@socket.io/redis-streams-adapter';
 
 import config from '../config/config';
 import { redisServer } from './redis-server';
-import ClientNode from '../services/clientnode-service';
+import ClientNode from '../services/clientnode';
 
 export class SocketServer {
   private static instance: SocketServer | null = null;
