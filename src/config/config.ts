@@ -12,14 +12,11 @@ const config = {
     origin: process.env.NODE_ENV === 'production' ? ['https://mitsi.app'] : '*',
     methods: ['GET', 'POST'],
   },
-  https: {
-    listenIp: '0.0.0.0',
-    listenPort: process.env.SERVER_LISTEN_PORT || 8000,
-    tls: {
-      cert: process.env.HTTPS_CERT || certPath,
-      key: process.env.HTTPS_KEY || keyPath,
-    },
+  tls: {
+    cert: process.env.HTTPS_CERT || certPath,
+    key: process.env.HTTPS_KEY || keyPath,
   },
+  port: process.env.PORT || 8000,
   apiServerUrl: process.env.API_SERVER_URL,
   apiServerApiKey: process.env.API_SERVER_API_KEY,
   recordingServerUrl: process.env.RECORDING_SERVER_URL,

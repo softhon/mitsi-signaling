@@ -5,5 +5,10 @@ export enum SignallingEvents {
   JoinWaiters = 'join-waiters',
 }
 export enum PubSubEvents {
-  'EndMeeting' = 'end-meeting',
+  Message = 'message',
+  EndMeeting = 'end-meeting',
+}
+
+export enum ServiceEvents {
+  Close = 'close',
 }
