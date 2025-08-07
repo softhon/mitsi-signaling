@@ -9,15 +9,12 @@ import ClientNode from '../services/clientnode-service';
 export class SocketServer {
   private static instance: SocketServer | null = null;
   private io: Server;
-  // private httpServer: HttpServer;
 
   private constructor(httpServer: HttpServer) {
     this.io = new Server(httpServer, {
       cors: config.cors,
       adapter: createAdapter(redisServer.getPubClient()),
     });
-
-    // handle connection
     this.setupConnectionHandlers();
   }
 

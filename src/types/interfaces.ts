@@ -1,10 +1,11 @@
 export type ProducerSource = 'mic' | 'camera' | 'screen' | 'screenAudio';
 
 export type TransportKind = 'producer' | 'consumer';
-export type AckCallback<T = unknown> = (
-  error: Error | null,
-  response?: T
-) => void;
+export type AckCallback<T = unknown> = (res: {
+  status: 'success' | 'error';
+  error?: Error | null;
+  response?: T;
+}) => void;
 export type PeerType = 'Recorder' | 'Attendee';
 
 export enum Role {
@@ -31,6 +32,11 @@ export enum HTTPSTATUS {
   NOT_FOUND = 404,
   CONFLICT = 409,
   INTERNAL_SERVER_ERROR = 500,
+}
+
+export interface MessageData {
+  event: string;
+  args: unknown;
 }
 
 export interface RoomData {
