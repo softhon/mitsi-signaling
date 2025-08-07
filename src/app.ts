@@ -23,7 +23,7 @@ app.use('/', Routes);
 const httpsServer = createServer(serverOption, app);
 
 // Initialize Redis and Socket.IO
-(async () => {
+(async (): Promise<void> => {
   try {
     // Connect Redis
     await redisServer.connect();
@@ -41,7 +41,7 @@ const httpsServer = createServer(serverOption, app);
   }
 })();
 
-const shutdown = async () => {
+const shutdown = async (): Promise<void> => {
   try {
     await SocketServer.getInstance().close();
     await redisServer.disconnect();

@@ -22,7 +22,7 @@ export class SocketServer {
     this.setupConnectionHandlers();
   }
 
-  static getInstance(httpServer?: HttpServer) {
+  static getInstance(httpServer?: HttpServer): SocketServer {
     if (!SocketServer.instance && !httpServer)
       throw new Error(
         'SocketServer instance not initialized. Provide httpServer for first initialization.'
@@ -34,7 +34,7 @@ export class SocketServer {
     return SocketServer.instance;
   }
 
-  private setupConnectionHandlers() {
+  private setupConnectionHandlers(): void {
     console.log('setupConnectionHandlers');
 
     this.io.on('connection', socket => {
@@ -48,11 +48,11 @@ export class SocketServer {
     });
   }
 
-  getIo() {
+  getIo(): Server {
     return this.io;
   }
 
-  async close() {
+  async close(): Promise<void> {
     this.io.close();
   }
 }

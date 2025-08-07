@@ -14,14 +14,14 @@ class RedisServer {
     this.subClient = this.pubClient.duplicate();
   }
 
-  static getInstance() {
+  static getInstance(): RedisServer {
     if (!RedisServer.instance) {
       RedisServer.instance = new RedisServer();
     }
     return RedisServer.instance;
   }
 
-  async connect() {
+  async connect(): Promise<void> {
     if (this.isConnected) {
       console.log('Redis clients already connected');
       return;
@@ -37,7 +37,7 @@ class RedisServer {
     }
   }
 
-  private async subscribe() {
+  private async subscribe(): Promise<void> {
     if (!this.isConnected)
       throw new Error('Redis clients are not connected. Call connect() first');
     await this.subClient.subscribe(PubSubEvents.Message, message => {
@@ -63,7 +63,7 @@ class RedisServer {
   }: {
     event: PubSubEvents;
     args: { [key: string]: unknown };
-  }) {
+  }): Promise<void> {
     if (!this.isConnected)
       throw new Error('Redis clients are not connected. Call connect() first');
 
@@ -72,11 +72,10 @@ class RedisServer {
     console.info(`Message published to channe ${message}`);
   }
 
-  getPubClient() {
-    if (!this.isConnected) console.log('Redis Not connected');
+  getPubClient(): RedisClientType {
     return this.pubClient;
   }
-  getSubClient() {
+  getSubClient(): RedisClientType {
     return this.subClient;
   }
 
@@ -89,7 +88,7 @@ class RedisServer {
     }
   }
 
-  async unsubscribe(channel: string) {
+  async unsubscribe(channel: string): Promise<void> {
     if (!this.isConnected)
       throw new Error('Redis clients are not connected. Call connect() first');
 

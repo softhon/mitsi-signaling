@@ -8,7 +8,7 @@ class ClientNodeConnection {
     this.listen();
   }
 
-  private listen = () => {
+  private listen(): void {
     if (!this.clientNode) return;
     this.clientNode.connection.on('connect_error', error => {
       console.log('ClientNode connection error', error);
@@ -17,13 +17,13 @@ class ClientNodeConnection {
       console.log('ClientNode connection error', error);
     });
     this.clientNode.connection.on('mesaage', () => {});
-  };
+  }
 
-  cleanup = () => {
+  cleanup(): void {
     if (this.clientNode) {
       this.clientNode.connection.removeAllListeners();
       this.clientNode = null;
     }
-  };
+  }
 }
 export default ClientNodeConnection;

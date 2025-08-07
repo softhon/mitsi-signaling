@@ -23,7 +23,7 @@ class ClientNode extends EventEmitter {
     console.info('ClientNode connected');
   }
 
-  close = () => {
+  close(): void {
     if (this.closed) return;
     this.closed = true;
     this.connectionHandler.cleanup();
@@ -31,6 +31,6 @@ class ClientNode extends EventEmitter {
     ClientNode.clientNodes.delete(this.connectionId);
     this.emit(ServiceEvents.Close);
     this.removeAllListeners();
-  };
+  }
 }
 export default ClientNode;
