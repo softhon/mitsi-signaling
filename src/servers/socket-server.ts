@@ -12,7 +12,6 @@ export class SocketServer {
   // private httpServer: HttpServer;
 
   private constructor(httpServer: HttpServer) {
-    console.log(redisServer);
     this.io = new Server(httpServer, {
       cors: config.cors,
       adapter: createAdapter(redisServer.getPubClient()),
@@ -35,13 +34,8 @@ export class SocketServer {
   }
 
   private setupConnectionHandlers(): void {
-    console.log('setupConnectionHandlers');
-
     this.io.on('connection', socket => {
-      console.log(`Client connected: ${socket.id}`);
-
       new ClientNode(socket);
-
       socket.on('disconnect', reason => {
         console.log(`Client disconnected ${socket.id}`, reason);
       });

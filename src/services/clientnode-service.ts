@@ -20,7 +20,10 @@ class ClientNode extends EventEmitter {
     this.connectionHandler = new ClientNodeConnection(this);
     ClientNode.clientNodes.set(this.connectionId, this);
 
-    console.info('ClientNode connected');
+    console.info(
+      'clientnode connected with connectionId - ',
+      this.connectionId
+    );
   }
 
   close(): void {
