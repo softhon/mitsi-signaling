@@ -39,7 +39,6 @@ class ClientNode extends EventEmitter {
   close(): void {
     if (this.closed) return;
     this.closed = true;
-    // this.connectionHandler.cleanup();
     this.connection.disconnect(true);
     ClientNode.clientNodes.delete(this.connectionId);
     this.emit(ServiceEvents.Close);
