@@ -1,4 +1,4 @@
-import { createClient, RedisClientType } from 'redis';
+import { createClient, RedisClientType, SetOptions } from 'redis';
 
 import { PubSubEvents } from '../types/events';
 import config from '../config/config';
@@ -77,6 +77,18 @@ class RedisServer {
   }
   getSubClient(): RedisClientType {
     return this.subClient;
+  }
+
+  async getValue(key: string): Promise<string | null> {
+    return await this.pubClient.get(key);
+  }
+
+  async setValue(
+    key: string,
+    value: string,
+    option?: SetOptions
+  ): Promise<string | null> {
+    return await this.pubClient.set(key, value, option);
   }
 
   async disconnect(): Promise<void> {
