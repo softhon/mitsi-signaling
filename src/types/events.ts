@@ -4,7 +4,7 @@ export enum SignallingEvents {
   JoinRoom = 'join-room',
   JoinVisitors = 'join-visitors',
   JoinWaiters = 'join-waiters',
-  GetRoomStatus = 'get-room-status',
+  GetRoomData = 'get-room-data',
   GetRtpCapabilities = 'get-rtp-capabilities',
 }
 export enum PubSubEvents {

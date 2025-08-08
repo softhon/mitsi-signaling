@@ -2,12 +2,19 @@ import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 
 import { ServiceEvents, SignallingEvents } from '../types/events';
-import { AckCallback, MessageData } from '../types/interfaces';
+import {
+  AckCallback,
+  MessageData,
+  PeerData,
+  RoomInstanceData,
+} from '../types/interfaces';
 import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
 import { getKey } from '../utils/helpers';
+import Waiter from './waiter';
+import { ValidationSchema } from '../utils/schema';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -64,7 +71,9 @@ class ClientNode extends EventEmitter {
   } = {
     'join-visitors': async (args, callback) => {
       try {
-        const { roomId, peerId } = args as { roomId: string; peerId: string };
+        const data = ValidationSchema.roomIdPeerId.parse(args);
+        const { roomId, peerId } = data;
+
         const lobby = Lobby.getLobby(roomId) || new Lobby({ roomId });
         const visitor = new Visitor({
           peerId,
@@ -100,8 +109,7 @@ class ClientNode extends EventEmitter {
         );
         const peers = await room.getPeersOnline();
         const roomData = await room.getData();
-        console.log(args);
-        callback({
+        return callback({
           status: 'success',
           response: {
             peers,
@@ -110,44 +118,111 @@ class ClientNode extends EventEmitter {
           },
         });
       } catch (error) {
-        console.error(error);
+        console.error(`Error from join-visitors`, error);
+        callback({
+          status: 'error',
+          error,
+        });
       }
     },
 
-    'join-waiters': (args, callback) => {
-      console.log('join-waiters');
-      console.log(args);
-      if (callback)
+    'join-waiters': async (args, callback) => {
+      try {
+        const data = ValidationSchema.roomIdPeerIdPeerData.parse(args);
+        const { roomId, peerId, peerData } = data;
+
+        const wasAParticipant = await redisServer.sIsMember(
+          getKey['roomPeerIds'](roomId),
+          peerId
+        );
+
+        if (!wasAParticipant) {
+          const lobby = Lobby.getLobby(roomId) || new Lobby({ roomId });
+          const waiter = new Waiter({
+            roomId,
+            peerId,
+            connection: this.connection,
+            data: peerData as PeerData,
+          });
+          lobby.addWaiter(waiter);
+        }
+
+        callback({
+          status: 'success',
+          response: {
+            wasAParticipant,
+          },
+        });
+      } catch (error) {
+        console.error(`Error from join-waiters`, error);
         callback({
           status: 'error',
+          error,
         });
+      }
     },
 
-    'get-room-status': (args, callback) => {
-      console.log('join-room');
-      console.log(args);
-      if (callback)
+    'get-room-data': async (args, callback) => {
+      try {
+        const data = ValidationSchema.roomId.parse(args);
+        const { roomId } = data;
+
+        const room = Room.getRoom(roomId);
+        if (room) {
+          const roomData = await room.getData();
+          return callback({
+            status: 'success',
+            response: {
+              roomData,
+            },
+          });
+        }
+        const redisData = await redisServer.get(getKey['room'](roomId));
+
+        if (redisData) {
+          const roomData: RoomInstanceData = JSON.parse(redisData);
+          return callback({
+            status: 'success',
+            response: {
+              roomData,
+            },
+          });
+        }
+
+        return callback({ status: 'success' });
+      } catch (error) {
+        console.error(`Error from get-room-data`, error);
         callback({
           status: 'error',
+          error,
         });
+      }
     },
 
     'get-rtp-capabilities': (args, callback) => {
-      console.log('join-room');
-      console.log(args);
-      if (callback)
+      try {
+        // Todo implement medianode to complete
+        return callback({ status: 'success' });
+      } catch (error) {
+        console.error(`Error to join-waiters`, error);
         callback({
           status: 'error',
+          error,
         });
+      }
     },
 
     'join-room': (args, callback) => {
-      console.log('join-room');
-      console.log(args);
-      if (callback)
+      try {
+        // Todo implement medianode to complete
+        return callback({ status: 'success' });
+      } catch (error) {
+        console.error(`Error to join-room`, error);
         callback({
           status: 'error',
+          error,
         });
+      }
     },
   };
 }
