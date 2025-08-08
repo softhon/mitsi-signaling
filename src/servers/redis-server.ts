@@ -79,16 +79,32 @@ class RedisServer {
     return this.subClient;
   }
 
-  async getValue(key: string): Promise<string | null> {
+  async get(key: string): Promise<string | null> {
     return await this.pubClient.get(key);
   }
 
-  async setValue(
+  async set(
     key: string,
     value: string,
     option?: SetOptions
   ): Promise<string | null> {
     return await this.pubClient.set(key, value, option);
+  }
+
+  async sAdd(key: string, member: string): Promise<number> {
+    return await this.pubClient.sAdd(key, member);
+  }
+
+  async sRem(key: string, member: string): Promise<number> {
+    return await this.pubClient.sRem(key, member);
+  }
+
+  async sIsMember(key: string, member: string): Promise<boolean> {
+    return await this.pubClient.sIsMember(key, member);
+  }
+
+  async sMembers(key: string): Promise<string[]> {
+    return await this.pubClient.sMembers(key);
   }
 
   async disconnect(): Promise<void> {
