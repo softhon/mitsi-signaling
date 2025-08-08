@@ -41,21 +41,36 @@ export interface HandState {
 
 export interface MessageData {
   event: string;
-  args: unknown;
+  args: { [key: string]: unknown };
 }
 
 export interface RoomData {
   id: string;
   title: string;
-  meetingId: string;
-  description: string;
-  hostUser: {
+  roomId: string;
+  description?: string;
+  host: {
     id: string;
     name: string;
   };
-  coHostUserEmails: string[];
-  guestUserEmails: string[];
+  coHostEmails: string[];
+  guestEmails: string[];
   allowWaiting?: boolean;
+}
+
+export interface RoomInstanceData {
+  roomId: string;
+  hostId: string;
+  coHostEmails: string[];
+  started: number;
+  maxDuration: number;
+  maxPeers: number;
+  allowRecording: boolean;
+  allowWaiting: boolean;
+  activeSpeakerPeerId?: string | null;
+  recording: boolean;
+  timeLeft?: number;
+  isFull?: boolean;
 }
 
 export interface PeerData {
