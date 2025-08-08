@@ -3,15 +3,15 @@ export type ProducerSource = 'mic' | 'camera' | 'screen' | 'screenAudio';
 export type TransportKind = 'producer' | 'consumer';
 export type AckCallback<T = { [key: string]: unknown }> = (res: {
   status: 'success' | 'error';
-  error?: Error | null;
+  error?: Error | unknown | null;
   response?: T;
 }) => void;
 export type PeerType = 'Recorder' | 'Attendee';
 
 export enum Role {
-  Moderator = 'MODERATOR',
-  Speaker = 'SPEAKER',
-  Attendee = 'ATTENDEE',
+  Moderator = 'Moderator',
+  Speaker = 'Speaker',
+  Participant = 'Participant',
 }
 
 export enum Tag {
@@ -20,7 +20,7 @@ export enum Tag {
   Moderator = 'Moderator',
   Speaker = 'Speaker',
   Pinned = 'Pinned',
-  Attendee = 'Attendee',
+  Participant = 'Participant',
 }
 
 export enum HTTPSTATUS {
