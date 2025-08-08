@@ -1,14 +1,19 @@
 import { Socket } from 'socket.io';
+
 import Base from './base';
+import { PeerData } from '../types/interfaces';
 
 class Waiter extends Base {
+  data: PeerData;
   constructor({
     roomId,
     peerId,
+    data,
     connection,
   }: {
     roomId: string;
     peerId: string;
+    data: PeerData;
     connection: Socket;
   }) {
     super({
@@ -16,6 +21,7 @@ class Waiter extends Base {
       peerId,
       connection,
     });
+    this.data = data;
   }
 }
 
