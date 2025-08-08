@@ -1,7 +1,7 @@
 export type ProducerSource = 'mic' | 'camera' | 'screen' | 'screenAudio';
 
 export type TransportKind = 'producer' | 'consumer';
-export type AckCallback<T = unknown> = (res: {
+export type AckCallback<T = { [key: string]: unknown }> = (res: {
   status: 'success' | 'error';
   error?: Error | null;
   response?: T;
@@ -84,10 +84,13 @@ export interface PeerData {
   jobTitle?: string;
   isRejoining?: boolean;
   isRecorder?: boolean;
+  hand?: HandState;
   roles?: Role[];
   tag?: Tag;
   pinned?: boolean;
   online?: boolean;
+  joined?: number;
+  reconnecting?: boolean;
 }
 
 export interface AttendeeData {
