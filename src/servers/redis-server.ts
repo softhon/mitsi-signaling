@@ -1,4 +1,4 @@
-import { createClient, RedisClientType } from 'redis';
+import { createClient, RedisClientType, SetOptions } from 'redis';
 
 import { PubSubEvents } from '../types/events';
 import config from '../config/config';
@@ -77,6 +77,34 @@ class RedisServer {
   }
   getSubClient(): RedisClientType {
     return this.subClient;
+  }
+
+  async get(key: string): Promise<string | null> {
+    return await this.pubClient.get(key);
+  }
+
+  async set(
+    key: string,
+    value: string,
+    option?: SetOptions
+  ): Promise<string | null> {
+    return await this.pubClient.set(key, value, option);
+  }
+
+  async sAdd(key: string, member: string): Promise<number> {
+    return await this.pubClient.sAdd(key, member);
+  }
+
+  async sRem(key: string, member: string): Promise<number> {
+    return await this.pubClient.sRem(key, member);
+  }
+
+  async sIsMember(key: string, member: string): Promise<boolean> {
+    return await this.pubClient.sIsMember(key, member);
+  }
+
+  async sMembers(key: string): Promise<string[]> {
+    return await this.pubClient.sMembers(key);
   }
 
   async disconnect(): Promise<void> {

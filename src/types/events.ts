@@ -2,8 +2,10 @@ export enum SignallingEvents {
   Message = 'message',
   Connected = 'connected',
   JoinRoom = 'join-room',
-  JoinLobby = 'join-lobby',
+  JoinVisitors = 'join-visitors',
   JoinWaiters = 'join-waiters',
+  GetRoomStatus = 'get-room-status',
+  GetRtpCapabilities = 'get-rtp-capabilities',
 }
 export enum PubSubEvents {
   Message = 'message',

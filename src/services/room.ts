@@ -1,5 +1,8 @@
 import EventEmitter from 'events';
 import Peer from './peer';
+import { redisServer } from '../servers/redis-server';
+import { PeerData, RoomData, RoomInstanceData } from '../types/interfaces';
+import { getKey } from '../utils/helpers';
 
 class Room extends EventEmitter {
   roomId: string;
@@ -7,13 +10,13 @@ class Room extends EventEmitter {
   coHostEmails: string[];
   started: number;
   maxDuration: number;
-  maxPeers: number; //
+  maxPeers: number;
   allowRecording: boolean;
   allowWaiting: boolean;
   timeLeft: number;
 
-  selfDestructTimeout: NodeJS.Timeout | null;
-  endCountDownInterval: NodeJS.Timeout | null;
+  selfDestructTimeout: NodeJS.Timeout | undefined;
+  endCountDownInterval: NodeJS.Timeout | undefined;
 
   private peers: Map<string, Peer>;
   recorder: Peer | null;
@@ -55,11 +58,149 @@ class Room extends EventEmitter {
     );
     this.peers = new Map();
 
-    this.selfDestructTimeout = null;
-    this.endCountDownInterval = null;
+    this.selfDestructTimeout = undefined;
+    this.endCountDownInterval = undefined;
 
     this.recorder = null;
-    this.closed = true;
+    this.closed = false;
+
+    Room.rooms.set(roomId, this);
+  }
+
+  async close(end?: boolean): Promise<void> {
+    if (this.closed) return;
+    if (end) console.log('End meeting');
+
+    for (const peer of this.peers.values()) {
+      peer.close();
+    }
+
+    clearInterval(this.selfDestructTimeout);
+    clearTimeout(this.endCountDownInterval);
+
+    this.removeAllListeners();
+  }
+
+  static async create(roomId: string): Promise<Room> {
+    try {
+      // get room from redis if ongoing
+      const activeRoom = await redisServer.get(`room:${roomId}`);
+
+      let roomInstanceData: RoomInstanceData;
+
+      if (activeRoom) {
+        roomInstanceData = JSON.parse(activeRoom);
+      } else {
+        // get room data from api
+
+        // use domi data for now
+        const roomData: RoomData = {
+          id: crypto.randomUUID(),
+          title: 'Hello Room',
+          roomId: 'rty-rex-rrt',
+          host: {
+            id: crypto.randomUUID(),
+            name: 'Favour Grace',
+          },
+          coHostEmails: [],
+          guestEmails: [],
+          allowWaiting: false,
+        };
+
+        roomInstanceData = {
+          roomId: roomData.roomId,
+          hostId: roomData.host.id,
+          coHostEmails: roomData.coHostEmails,
+          started: Date.now(),
+          maxPeers: 50,
+          maxDuration: 180, // minutes
+          allowRecording: false,
+          allowWaiting: false,
+          recording: false,
+        };
+      }
+      const room = new Room(roomInstanceData);
+      await redisServer.set(
+        `room:${roomId}`,
+        JSON.stringify(roomInstanceData),
+        { NX: true }
+      );
+
+      return room;
+    } catch (error) {
+      console.log(error);
+      throw error;
+    }
+  }
+
+  static getRoom(roomId: string): Room | undefined {
+    return Room.rooms.get(roomId);
+  }
+
+  addPeer(peer: Peer): void {
+    this.peers.set(peer.id, peer);
+  }
+
+  getPeer(peerId: string): Peer | undefined {
+    return this.peers.get(peerId);
+  }
+  removePeer(peerId: string): void {
+    this.peers.delete(peerId);
+  }
+
+  async getPeersFromDB(): Promise<PeerData[]> {
+    const members = await redisServer.sMembers(
+      getKey['roomPeers'](this.roomId)
+    );
+
+    const peers: PeerData[] = [];
+
+    members.forEach(peer => {
+      peers.push(JSON.parse(peer));
+    });
+
+    return peers;
+  }
+
+  async getPeersOnline(): Promise<PeerData[]> {
+    const peers = await this.getPeersFromDB();
+    return peers.filter(peer => peer.online);
+  }
+
+  async updatePeerInDB(peer: Peer, value?: Partial<PeerData>): Promise<void> {
+    const peers = await this.getPeersFromDB();
+    const peerData = peers.find(value => value.id === peer.id);
+    if (!peerData) return;
+    await redisServer.sRem(
+      getKey['roomPeers'](this.roomId),
+      JSON.stringify(peerData)
+    );
+
+    await redisServer.sAdd(
+      getKey['roomPeers'](this.roomId),
+      JSON.stringify({
+        ...peer.getData(),
+        ...value,
+      })
+    );
+  }
+
+  async getActiveSpeakerPeerId(): Promise<string | null> {
+    const data = await redisServer.get(
+      getKey['roomActiveSpeakerPeerId'](this.roomId)
+    );
+    return data;
+  }
+
+  async getData(): Promise<RoomInstanceData | undefined> {
+    const data = await redisServer.get(getKey['room'](this.roomId));
+    if (!data) return;
+    const activeSpeakerPeerId = await this.getActiveSpeakerPeerId();
+    return {
+      ...JSON.parse(data),
+      activeSpeakerPeerId,
+      timeLeft: this.timeLeft,
+    };
   }
 }
 

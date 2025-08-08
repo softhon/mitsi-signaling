@@ -1,7 +1,7 @@
 export type ProducerSource = 'mic' | 'camera' | 'screen' | 'screenAudio';
 
 export type TransportKind = 'producer' | 'consumer';
-export type AckCallback<T = unknown> = (res: {
+export type AckCallback<T = { [key: string]: unknown }> = (res: {
   status: 'success' | 'error';
   error?: Error | null;
   response?: T;
@@ -41,21 +41,36 @@ export interface HandState {
 
 export interface MessageData {
   event: string;
-  args: unknown;
+  args: { [key: string]: unknown };
 }
 
 export interface RoomData {
   id: string;
   title: string;
-  meetingId: string;
-  description: string;
-  hostUser: {
+  roomId: string;
+  description?: string;
+  host: {
     id: string;
     name: string;
   };
-  coHostUserEmails: string[];
-  guestUserEmails: string[];
+  coHostEmails: string[];
+  guestEmails: string[];
   allowWaiting?: boolean;
+}
+
+export interface RoomInstanceData {
+  roomId: string;
+  hostId: string;
+  coHostEmails: string[];
+  started: number;
+  maxDuration: number;
+  maxPeers: number;
+  allowRecording: boolean;
+  allowWaiting: boolean;
+  activeSpeakerPeerId?: string | null;
+  recording: boolean;
+  timeLeft?: number;
+  isFull?: boolean;
 }
 
 export interface PeerData {
@@ -69,10 +84,13 @@ export interface PeerData {
   jobTitle?: string;
   isRejoining?: boolean;
   isRecorder?: boolean;
+  hand?: HandState;
   roles?: Role[];
   tag?: Tag;
   pinned?: boolean;
   online?: boolean;
+  joined?: number;
+  reconnecting?: boolean;
 }
 
 export interface AttendeeData {

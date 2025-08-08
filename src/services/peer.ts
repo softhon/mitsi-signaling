@@ -1,9 +1,10 @@
 import { Socket } from 'socket.io';
-import { HandState, PeerData, Role, Tag } from '../types/interfaces';
-import ServiceBase from './servicebase';
-import { HEARTBEAT_TIMEOUT } from '../utils/contants';
 
-class Peer extends ServiceBase {
+import Base from './base';
+import { HEARTBEAT_TIMEOUT } from '../utils/contants';
+import { HandState, PeerData, Role, Tag } from '../types/interfaces';
+
+class Peer extends Base {
   isRecorder: boolean;
   reconnecting?: boolean;
   data: PeerData;
@@ -58,6 +59,17 @@ class Peer extends ServiceBase {
         this.close();
       }
     }, HEARTBEAT_TIMEOUT);
+  }
+
+  getData(): PeerData {
+    return {
+      ...this.data,
+      roles: this.roles,
+      hand: this.hand,
+      tag: this.tag,
+      joined: this.joined,
+      reconnecting: this.reconnecting,
+    };
   }
 }
 
