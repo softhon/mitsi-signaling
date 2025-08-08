@@ -4,6 +4,7 @@ import { MessageData } from '../types/interfaces';
 import { SignallingEvents } from '../types/events';
 
 abstract class Base extends EventEmitter {
+  id: string;
   roomId: string;
   peerId: string;
   connection: Socket;
@@ -19,8 +20,9 @@ abstract class Base extends EventEmitter {
     connection: Socket;
   }) {
     super();
-    this.roomId = roomId;
+    this.id = peerId;
     this.peerId = peerId;
+    this.roomId = roomId;
     this.connection = connection;
     this.closed = false;
   }
