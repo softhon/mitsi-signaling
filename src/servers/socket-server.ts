@@ -33,9 +33,6 @@ export class SocketServer {
   private setupConnectionHandlers(): void {
     this.io.on('connection', socket => {
       new ClientNode(socket);
-      socket.on('disconnect', reason => {
-        console.log(`Client disconnected ${socket.id}`, reason);
-      });
     });
   }
 
