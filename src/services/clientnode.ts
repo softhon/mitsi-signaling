@@ -5,6 +5,9 @@ import { ServiceEvents, SignallingEvents } from '../types/events';
 import { AckCallback, MessageData } from '../types/interfaces';
 import Lobby from './lobby';
 import Visitor from './visitor';
+import Room from './room';
+import { redisServer } from '../servers/redis-server';
+import { getKey } from '../utils/helpers';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -55,26 +58,60 @@ class ClientNode extends EventEmitter {
 
   private eventHandlers: {
     [key in SignallingEvents]?: (
-      args?: { [key: string]: unknown },
-      callback?: AckCallback
+      args: { [key: string]: unknown },
+      callback: AckCallback
     ) => void;
   } = {
-    'join-visitors': (args, callback) => {
-      const { roomId, peerId } = args as { roomId: string; peerId: string };
-      const lobby = Lobby.getLobby(roomId) || new Lobby({ roomId });
-      const visitor = new Visitor({
-        peerId,
-        roomId,
-        connection: this.connection,
-      });
-      lobby.addVisitor(visitor);
-      this.connection.join(`lobby-${roomId}`);
+    'join-visitors': async (args, callback) => {
+      try {
+        const { roomId, peerId } = args as { roomId: string; peerId: string };
+        const lobby = Lobby.getLobby(roomId) || new Lobby({ roomId });
+        const visitor = new Visitor({
+          peerId,
+          roomId,
+          connection: this.connection,
+        });
+        lobby.addVisitor(visitor);
+        this.connection.join(getKey['lobby'](roomId));
+        let room = Room.getRoom(roomId);
 
-      console.log(args);
-      if (callback)
+        if (!room) {
+          // room could be running in another instance
+          // find room in redis
+          const roomInstance = await redisServer.get(getKey['room'](roomId));
+
+          if (roomInstance) {
+            room = await Room.create(roomId);
+          }
+        }
+        // return no peers as room is yet to start
+        if (!room)
+          return callback({
+            status: 'success',
+            response: {
+              peers: [],
+            },
+          });
+
+        // check if visitor was a participant
+        const wasAParticipant = await redisServer.sIsMember(
+          getKey['roomPeerIds'](roomId),
+          peerId
+        );
+        const peers = await room.getPeersOnline();
+        const roomData = await room.getData();
+        console.log(args);
         callback({
           status: 'success',
+          response: {
+            peers,
+            room: roomData,
+            wasAParticipant,
+          },
         });
+      } catch (error) {
+        console.error(error);
+      }
     },
 
     'join-waiters': (args, callback) => {
