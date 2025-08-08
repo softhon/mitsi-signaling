@@ -59,6 +59,17 @@ class Peer extends Base {
       }
     }, HEARTBEAT_TIMEOUT);
   }
+
+  getData(): PeerData {
+    return {
+      ...this.data,
+      roles: this.roles,
+      hand: this.hand,
+      tag: this.tag,
+      joined: this.joined,
+      reconnecting: this.reconnecting,
+    };
+  }
 }
 
 export default Peer;
