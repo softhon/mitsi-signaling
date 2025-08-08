@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
-// import ClientNodeHandler from '../handlers/clientnode-handler';
+
 import { ServiceEvents, SignallingEvents } from '../types/events';
 import { AckCallback, MessageData } from '../types/interfaces';
 import Lobby from './lobby';
