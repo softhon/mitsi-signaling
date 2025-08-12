@@ -21,7 +21,7 @@ class ClientNode extends EventEmitter {
   connection: Socket;
   closed: boolean;
 
-  static clientNodes = new Map<string, ClientNode>();
+  private static clientNodes = new Map<string, ClientNode>();
 
   constructor(connection: Socket) {
     super();
