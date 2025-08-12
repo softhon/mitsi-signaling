@@ -40,6 +40,8 @@
     "typescript-eslint": "^8.38.0"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.13.4",
+    "@grpc/proto-loader": "^0.8.0",
     "@socket.io/cluster-adapter": "^0.2.2",
     "@socket.io/redis-streams-adapter": "^0.2.2",
     "@socket.io/sticky": "^1.0.4",
