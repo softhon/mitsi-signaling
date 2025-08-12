@@ -4,7 +4,7 @@ import fs from 'fs';
 import cors from 'cors';
 import helmet from 'helmet';
 
-import config from './config/config';
+import config from './config';
 import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
