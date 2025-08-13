@@ -12,7 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "fix": "npm run format && npm run lint -- --fix"
+    "fix": "npm run format && npm run lint -- --fix",
+    "proto:gen": "./proto-gen.sh"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@tsconfig/node24": "^24.0.1",
+    "@types/cors": "^2.8.19",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.1.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
@@ -39,11 +41,14 @@
     "typescript-eslint": "^8.38.0"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.13.4",
+    "@grpc/proto-loader": "^0.8.0",
     "@socket.io/cluster-adapter": "^0.2.2",
     "@socket.io/redis-streams-adapter": "^0.2.2",
     "@socket.io/sticky": "^1.0.4",
     "@types/express": "^5.0.3",
     "axios": "^1.11.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "helmet": "^8.1.0",

@@ -8,7 +8,7 @@ class Lobby extends EventEmitter {
   private visitors: Map<string, Visitor>;
   private waiters: Map<string, Waiter>;
   private selfDestructTimeout: NodeJS.Timeout | undefined;
-  static lobbys = new Map<string, Lobby>();
+  private static lobbys = new Map<string, Lobby>();
 
   constructor({ roomId }: { roomId: string }) {
     super();

@@ -18,7 +18,7 @@ class Peer extends Base {
   routerId: string;
   closed: boolean;
 
-  static peers = new Map<string, Peer>();
+  // static peers = new Map<string, Peer>();
 
   constructor({
     data,

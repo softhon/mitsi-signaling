@@ -2,7 +2,7 @@ import { Server as HttpServer } from 'https';
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-streams-adapter';
 
-import config from '../config/config';
+import config from '../config';
 import { redisServer } from './redis-server';
 import ClientNode from '../services/clientnode';
 

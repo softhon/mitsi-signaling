@@ -1,7 +1,7 @@
 import { createClient, RedisClientType, SetOptions } from 'redis';
 
 import { PubSubEvents } from '../types/events';
-import config from '../config/config';
+import config from '../config';
 
 class RedisServer {
   private static instance: RedisServer | null = null;

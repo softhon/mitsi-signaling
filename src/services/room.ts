@@ -23,7 +23,7 @@ class Room extends EventEmitter {
 
   closed: boolean;
 
-  static rooms = new Map<string, Room>();
+  private static rooms = new Map<string, Room>();
 
   constructor({
     roomId,
