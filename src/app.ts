@@ -8,6 +8,7 @@ import config from './config';
 import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
+import MediaNode from './services/medianode';
 
 const serverOption = {
   key: fs.readFileSync(config.tls.key, 'utf8'),
@@ -30,6 +31,8 @@ const httpsServer = createServer(serverOption, app);
     httpsServer.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });
+
+    new MediaNode({ ip: '0.0.0.0', host: '', id: '' });
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);
