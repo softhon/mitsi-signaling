@@ -84,7 +84,7 @@ class Room extends EventEmitter {
   static async create(roomId: string): Promise<Room> {
     try {
       // get room from redis if ongoing
-      const activeRoom = await redisServer.get(`room:${roomId}`);
+      const activeRoom = await redisServer.get(getKey['room'](roomId));
 
       let roomInstanceData: RoomInstanceData;
 
@@ -121,7 +121,7 @@ class Room extends EventEmitter {
       }
       const room = new Room(roomInstanceData);
       await redisServer.set(
-        `room:${roomId}`,
+        getKey['room'](roomId),
         JSON.stringify(roomInstanceData),
         { NX: true }
       );
