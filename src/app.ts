@@ -1,6 +1,5 @@
 import { createServer } from 'https';
 import express from 'express';
-import fs from 'fs';
 import cors from 'cors';
 import helmet from 'helmet';
 
@@ -10,18 +9,13 @@ import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
 import MediaNode from './services/medianode';
 
-const serverOption = {
-  key: fs.readFileSync(config.tls.key, 'utf8'),
-  cert: fs.readFileSync(config.tls.cert, 'utf8'),
-};
-
 const app = express();
 app.use(cors(config.cors));
 app.use(helmet());
 app.use(express.json());
 app.use('/', Routes);
 
-const httpsServer = createServer(serverOption, app);
+const httpsServer = createServer(config.httpsServerOptions, app);
 
 (async (): Promise<void> => {
   try {
