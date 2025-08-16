@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 
 import Base from './base';
-import { HEARTBEAT_TIMEOUT } from '../utils/contants';
+import { HEARTBEAT_TIMEOUT } from '../lib/contants';
 import { HandState, PeerData, Role, Tag } from '../types/interfaces';
 
 class Peer extends Base {

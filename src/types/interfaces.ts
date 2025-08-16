@@ -128,3 +128,9 @@ export interface Reaction {
   position: `${number}%`;
   timestamp: number;
 }
+
+export interface SignalnodeData {
+  id: string;
+  ip: string;
+  address: string;
+}

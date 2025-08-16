@@ -12,9 +12,9 @@ import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
-import { getKey } from '../utils/helpers';
+import { getRedisKey } from '../lib/utils';
 import Waiter from './waiter';
-import { ValidationSchema } from '../utils/schema';
+import { ValidationSchema } from '../lib/schema';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -81,13 +81,15 @@ class ClientNode extends EventEmitter {
           connection: this.connection,
         });
         lobby.addVisitor(visitor);
-        this.connection.join(getKey['lobby'](roomId));
+        this.connection.join(getRedisKey['lobby'](roomId));
         let room = Room.getRoom(roomId);
 
         if (!room) {
           // room could be running in another instance
           // find room in redis
-          const roomInstance = await redisServer.get(getKey['room'](roomId));
+          const roomInstance = await redisServer.get(
+            getRedisKey['room'](roomId)
+          );
 
           if (roomInstance) {
             room = await Room.create(roomId);
@@ -104,7 +106,7 @@ class ClientNode extends EventEmitter {
 
         // check if visitor was a participant
         const wasAParticipant = await redisServer.sIsMember(
-          getKey['roomPeerIds'](roomId),
+          getRedisKey['roomPeerIds'](roomId),
           peerId
         );
         const peers = await room.getPeersOnline();
@@ -132,7 +134,7 @@ class ClientNode extends EventEmitter {
         const { roomId, peerId, peerData } = data;
 
         const wasAParticipant = await redisServer.sIsMember(
-          getKey['roomPeerIds'](roomId),
+          getRedisKey['roomPeerIds'](roomId),
           peerId
         );
 
@@ -177,7 +179,7 @@ class ClientNode extends EventEmitter {
             },
           });
         }
-        const redisData = await redisServer.get(getKey['room'](roomId));
+        const redisData = await redisServer.get(getRedisKey['room'](roomId));
 
         if (redisData) {
           const roomData: RoomInstanceData = JSON.parse(redisData);
