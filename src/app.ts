@@ -8,6 +8,9 @@ import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
 import MediaNode from './services/medianode';
+import { SignalnodeData } from './types/interfaces';
+import { getRedisKey } from './lib/utils';
+// import { publicIpv4 } from 'public-ip';
 
 const app = express();
 app.use(cors(config.cors));
@@ -16,6 +19,8 @@ app.use(express.json());
 app.use('/', Routes);
 
 const httpsServer = createServer(config.httpsServerOptions, app);
+
+let signalnodeData: SignalnodeData;
 
 (async (): Promise<void> => {
   try {
@@ -26,15 +31,36 @@ const httpsServer = createServer(config.httpsServerOptions, app);
       console.log(`Server running on port ${config.port}`);
     });
 
-    new MediaNode({ ip: '0.0.0.0', host: '', id: '' });
+    // new MediaNode({ ip: '0.0.0.0', host: '', id: '' });
+
+    // register signalnode
+    const { publicIpv4 } = await import('public-ip');
+    const ip = await publicIpv4();
+    signalnodeData = {
+      id: config.serverId,
+      ip,
+      address: `${config.port}`,
+    };
+    await redisServer.sAdd(
+      getRedisKey['signalnodesRunning'](),
+      JSON.stringify(signalnodeData)
+    );
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);
   }
 })();
 
+// register/unregister signalnode
+
 const shutdown = async (): Promise<void> => {
   try {
+    // remove signal node
+    await redisServer.sRem(
+      getRedisKey['signalnodesRunning'](),
+      JSON.stringify(signalnodeData)
+    );
+    console.log('Remove node');
     await SocketServer.getInstance().close();
     await redisServer.disconnect();
     httpsServer.close();
