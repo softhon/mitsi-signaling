@@ -2,12 +2,7 @@ import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 
 import { ServiceEvents, SignallingEvents } from '../types/events';
-import {
-  AckCallback,
-  MessageData,
-  PeerData,
-  RoomInstanceData,
-} from '../types/interfaces';
+import { AckCallback, MessageData, PeerData, RoomInstanceData } from '../types';
 import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';

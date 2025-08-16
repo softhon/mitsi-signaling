@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 
 import Base from './base';
-import { PeerData } from '../types/interfaces';
+import { PeerData } from '../types';
 
 class Waiter extends Base {
   data: PeerData;

@@ -8,8 +8,8 @@ import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
 import MediaNode from './services/medianode';
-import { SignalnodeData } from './types/interfaces';
-import { getRedisKey } from './lib/utils';
+import { SignalnodeData } from './types';
+import { getRedisKey, registerSignalNode } from './lib/utils';
 // import { publicIpv4 } from 'public-ip';
 
 const app = express();
@@ -31,20 +31,9 @@ let signalnodeData: SignalnodeData;
       console.log(`Server running on port ${config.port}`);
     });
 
-    // new MediaNode({ ip: '0.0.0.0', host: '', id: '' });
-
     // register signalnode
-    const { publicIpv4 } = await import('public-ip');
-    const ip = await publicIpv4();
-    signalnodeData = {
-      id: config.serverId,
-      ip,
-      address: `${config.port}`,
-    };
-    await redisServer.sAdd(
-      getRedisKey['signalnodesRunning'](),
-      JSON.stringify(signalnodeData)
-    );
+    signalnodeData = await registerSignalNode();
+    // new MediaNode({ ip: '0.0.0.0', host: '', id: '' });
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);

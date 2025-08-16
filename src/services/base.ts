@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
-import { MessageData } from '../types/interfaces';
+import { MessageData } from '../types';
 import { SignallingEvents } from '../types/events';
 
 abstract class Base extends EventEmitter {

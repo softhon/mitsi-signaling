@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import Peer from './peer';
 import { redisServer } from '../servers/redis-server';
-import { PeerData, RoomData, RoomInstanceData } from '../types/interfaces';
+import { PeerData, RoomData, RoomInstanceData } from '../types';
 import { getRedisKey } from '../lib/utils';
 
 class Room extends EventEmitter {

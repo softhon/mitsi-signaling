@@ -1,5 +1,6 @@
+import config from '../config';
 import { redisServer } from '../servers/redis-server';
-import { SignalnodeData } from '../types/interfaces';
+import { SignalnodeData } from '../types';
 
 export const getRedisKey = {
   room: (roomId: string): string => `room-${roomId}`,
@@ -15,15 +16,21 @@ export const getRedisKey = {
   roomSignalnodes: (roomId: string): string => `room-${roomId}-signalnodes`,
 };
 
-export const registerNode = async (
-  signalnode: SignalnodeData
-): Promise<void> => {
+export const registerSignalNode = async (): Promise<SignalnodeData> => {
   try {
+    const { publicIpv4 } = await import('public-ip');
+    const ip = await publicIpv4();
+    const signalnodeData: SignalnodeData = {
+      id: ip || config.serverId,
+      ip,
+      address: `${config.port}`,
+    };
     await redisServer.sAdd(
       getRedisKey['signalnodesRunning'](),
-      JSON.stringify(signalnode)
+      JSON.stringify(signalnodeData)
     );
+    return signalnodeData;
   } catch (error) {
-    console.log(error);
+    throw error;
   }
 };
