@@ -21,7 +21,7 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
     const { publicIpv4 } = await import('public-ip');
     const ip = await publicIpv4();
     const signalnodeData: SignalnodeData = {
-      id: ip || config.serverId,
+      id: ip || config.nodeId,
       ip,
       address: `${config.port}`,
     };
