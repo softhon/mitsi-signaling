@@ -9,8 +9,10 @@ import { getRedisKey } from '../lib/utils';
 import { MediaNodeData } from '../types';
 import { ProtoGrpcType } from '../protos/gen/media-signaling';
 import { MediaSignalingClient } from '../protos/gen/mediaSignalingPackage/MediaSignaling';
-import { SendMessageRequest } from '../protos/gen/mediaSignalingPackage/SendMessageRequest';
-import { SendMessageResponse__Output } from '../protos/gen/mediaSignalingPackage/SendMessageResponse';
+import { MessageRequest } from '../protos/gen/mediaSignalingPackage/MessageRequest';
+import { MessageResponse__Output } from '../protos/gen/mediaSignalingPackage/MessageResponse';
+import config from '../config';
+import { MediaSignalingActions as MSA } from '../types/actions';
 
 const PROTO_FILE = path.resolve(__dirname, '../protos/media-signaling.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_FILE);
@@ -39,9 +41,10 @@ class MediaNode extends EventEmitter {
   private grpcPort: string | number;
   private address: string;
   private grpcClient: MediaSignalingClient | null;
-  private grpcCall:
-    | grpc.ClientDuplexStream<SendMessageRequest, SendMessageResponse__Output>
-    | undefined;
+  private grpcCall: grpc.ClientDuplexStream<
+    MessageRequest,
+    MessageResponse__Output
+  > | null;
   private static mediaNodes = new Map<string, MediaNode>();
 
   private connectionState: ConnectionState;
@@ -57,6 +60,8 @@ class MediaNode extends EventEmitter {
     ip = '0.0.0.0',
     address,
     grpcPort = 50052,
+    grpcClient,
+    grpcCall,
     reconnectConfig = {
       maxRetries: 10,
       initialDelay: 1000,
@@ -68,6 +73,8 @@ class MediaNode extends EventEmitter {
     ip: string;
     address: string;
     grpcPort?: string | number;
+    grpcClient: MediaSignalingClient;
+    grpcCall: grpc.ClientDuplexStream<MessageRequest, MessageResponse__Output>;
     reconnectConfig?: Partial<ReconnectConfig>;
   }) {
     super();
@@ -75,14 +82,14 @@ class MediaNode extends EventEmitter {
     this.ip = ip;
     this.address = address;
     this.grpcPort = grpcPort;
-    this.grpcClient = null;
-    this.grpcCall = undefined;
+    this.grpcClient = grpcClient;
+    this.grpcCall = grpcCall;
 
     this.connectionState = ConnectionState.DISCONNECTED;
     this.reconnectAttempts = 0;
     this.reconnectTimer = null;
     this.healthCheckTimer = null;
-    this.clientId = crypto.randomUUID();
+    this.clientId = config.nodeId;
     this.isShuttingDown = false;
 
     this.reconnectConfig = {
@@ -94,7 +101,8 @@ class MediaNode extends EventEmitter {
     };
 
     MediaNode.mediaNodes.set(this.id, this);
-    this.connect();
+
+    this.handleMessages();
   }
 
   static connectToRunningNodes = async (): Promise<void> => {
@@ -107,7 +115,42 @@ class MediaNode extends EventEmitter {
       const connectionPromises = redisData.map(data => {
         try {
           const mediaNodesData: MediaNodeData = JSON.parse(data);
-          return new MediaNode(mediaNodesData);
+
+          const grpcClient =
+            new protoDescriptor.mediaSignalingPackage.MediaSignaling(
+              `${mediaNodesData.ip}:${mediaNodesData.grpcPort}`,
+              grpc.credentials.createInsecure(),
+              {
+                'grpc.keepalive_time_ms': 10000,
+                'grpc.keepalive_timeout_ms': 5000,
+                'grpc.keepalive_permit_without_calls': 1,
+                'grpc.http2.max_pings_without_data': 0,
+                'grpc.http2.min_time_between_pings_ms': 10000,
+                'grpc.http2.min_ping_interval_without_data_ms': 300000,
+              }
+            );
+
+          // Wait for client to be ready with timeout
+          const deadline = new Date();
+          deadline.setMilliseconds(deadline.getMilliseconds() + 15000);
+
+          grpcClient.waitForReady(deadline, error => {
+            if (error) {
+              throw error;
+            } else {
+              console.log('GRPC Connection Ready');
+            }
+          });
+          // Establish bidirectional stream
+          const metadata = new grpc.Metadata();
+          metadata.set('clientId', config.nodeId);
+          const grpcCall = grpcClient.message(metadata);
+
+          return new MediaNode({
+            ...mediaNodesData,
+            grpcClient,
+            grpcCall,
+          });
         } catch (parseError) {
           console.error(`Failed to parse media node data: ${data}`, parseError);
           return null;
@@ -152,37 +195,6 @@ class MediaNode extends EventEmitter {
     return delay + Math.random() * 1000; // Add jitter
   }
 
-  private cleanup(): void {
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-
-    if (this.healthCheckTimer) {
-      clearInterval(this.healthCheckTimer);
-      this.healthCheckTimer = null;
-    }
-
-    if (this.grpcCall) {
-      try {
-        this.grpcCall.removeAllListeners();
-        this.grpcCall.end();
-      } catch (error) {
-        console.warn(`Error ending gRPC call for node ${this.id}:`, error);
-      }
-      this.grpcCall = undefined;
-    }
-
-    if (this.grpcClient) {
-      try {
-        this.grpcClient.close();
-      } catch (error) {
-        console.warn(`Error closing gRPC client for node ${this.id}:`, error);
-      }
-      this.grpcClient = null;
-    }
-  }
-
   private setupHealthCheck(): void {
     if (this.healthCheckTimer) {
       clearInterval(this.healthCheckTimer);
@@ -193,7 +205,7 @@ class MediaNode extends EventEmitter {
         try {
           // Send a ping message to check connection health
           this.grpcCall.write({
-            type: 'ping',
+            action: 'ping',
             args: JSON.stringify({ timestamp: Date.now() }),
           });
         } catch (error) {
@@ -232,116 +244,40 @@ class MediaNode extends EventEmitter {
     this.setState(ConnectionState.RECONNECTING);
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
-      this.connect();
+      // this.connect();
     }, delay);
   }
 
-  async connect(): Promise<void> {
-    if (this.isShuttingDown) {
-      console.log(
-        `Node ${this.id} is shutting down, skipping connection attempt`
-      );
-      return;
-    }
-
-    if (this.connectionState === ConnectionState.CONNECTING) {
-      console.log(`Connection already in progress for node ${this.id}`);
-      return;
-    }
-
-    this.setState(ConnectionState.CONNECTING);
-    this.cleanup(); // Clean up any existing connections
-
+  sendMessage(action: MSA, args?: { [key: string]: unknown }): boolean {
+    if (!this.grpcCall) return false;
     try {
-      // Create gRPC client with proper options
-      this.grpcClient =
-        new protoDescriptor.mediaSignalingPackage.MediaSignaling(
-          `${this.ip}:${this.grpcPort}`,
-          grpc.credentials.createInsecure(),
-          {
-            'grpc.keepalive_time_ms': 10000,
-            'grpc.keepalive_timeout_ms': 5000,
-            'grpc.keepalive_permit_without_calls': 1,
-            'grpc.http2.max_pings_without_data': 0,
-            'grpc.http2.min_time_between_pings_ms': 10000,
-            'grpc.http2.min_ping_interval_without_data_ms': 300000,
-          }
-        );
-
-      // Wait for client to be ready with timeout
-      await this.waitForClientReady(15000);
-
-      // Establish bidirectional stream
-      const metadata = new grpc.Metadata();
-      metadata.set('clientId', this.clientId);
-      metadata.set('nodeId', this.id);
-
-      this.grpcCall = this.grpcClient.SendMessage(metadata);
-      this.setupStreamHandlers();
-
-      // Send initial connection message
       this.grpcCall.write({
-        type: 'connect',
-        args: JSON.stringify({
-          status: 'success',
-          nodeId: this.id,
-          timestamp: Date.now().toString(),
-        }),
+        action,
+        args: JSON.stringify(args || {}),
       });
-
-      this.setState(ConnectionState.CONNECTED);
-      this.reconnectAttempts = 0;
-      this.setupHealthCheck();
-      this.emit('connected', { nodeId: this.id });
-
-      console.log(
-        `Successfully connected to gRPC server for node ${this.id} at ${this.ip}:${this.grpcPort}`
-      );
+      return true;
     } catch (error) {
-      console.error(
-        `Failed to connect to gRPC server for node ${this.id}:`,
-        error
-      );
-      this.handleConnectionError(error as Error);
+      console.error(` Error sending message to client ${this.id}:`, error);
+      return false;
     }
   }
 
-  private waitForClientReady(timeoutMs: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.grpcClient) {
-        reject(new Error('gRPC client is null'));
-        return;
-      }
-
-      const deadline = new Date();
-      deadline.setMilliseconds(deadline.getMilliseconds() + timeoutMs);
-
-      this.grpcClient.waitForReady(deadline, error => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve();
-        }
-      });
-    });
-  }
-
-  private setupStreamHandlers(): void {
+  private handleMessages(): void {
     if (!this.grpcCall) return;
+    // Handle incoming messages
 
-    this.grpcCall.on('data', (chunk: SendMessageResponse__Output) => {
-      console.log(`Received data from MediaNode ${this.id}:`, chunk);
-      this.emit('message', { data: chunk, nodeId: this.id });
+    this.grpcCall.on('data', (message: MessageRequest) => {
+      const { action, args } = message;
+      if (!action) return;
+      const handler = this.actionHandlers[action as MSA];
 
-      // Handle pong responses for health checks
-      if (chunk.type === 'pong') {
-        console.log(`Health check pong received from node ${this.id}`);
-      }
+      if (handler) handler(args && JSON.parse(args));
     });
 
+    // Handle client disconnection
     this.grpcCall.on('end', () => {
-      console.log(`Stream ended for MediaNode ${this.id}`);
-      this.handleConnectionError(new Error('Stream ended'));
+      console.log(`Client ${this.id} ended the connection`);
+      // close connection
     });
 
     this.grpcCall.on('error', (error: Error) => {
@@ -355,61 +291,12 @@ class MediaNode extends EventEmitter {
         this.handleConnectionError(new Error('Stream closed unexpectedly'));
       }
     });
-  }
 
-  async sendMessage(message: SendMessageRequest): Promise<boolean> {
-    if (!this.isConnected || !this.grpcCall) {
-      console.warn(
-        `Cannot send message to MediaNode ${this.id}: not connected`
-      );
-      this.emit('sendError', {
-        error: new Error('Not connected'),
-        message,
-        nodeId: this.id,
-      });
-      return false;
-    }
-
-    try {
-      this.grpcCall.write(message);
-      return true;
-    } catch (error) {
-      console.error(`Error sending message to MediaNode ${this.id}:`, error);
-      this.emit('sendError', { error, message, nodeId: this.id });
-      this.handleConnectionError(error as Error);
-      return false;
-    }
-  }
-
-  async disconnect(): Promise<void> {
-    console.log(`Disconnecting MediaNode ${this.id}`);
-    this.isShuttingDown = true;
-
-    // Send disconnect message if connected
-    if (this.isConnected && this.grpcCall) {
-      try {
-        this.grpcCall.write({
-          type: 'disconnect',
-          args: JSON.stringify({
-            reason: 'client_disconnect',
-            timestamp: Date.now().toString(),
-          }),
-        });
-
-        // Give some time for the message to be sent
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        console.warn(
-          `Error sending disconnect message for node ${this.id}:`,
-          error
-        );
-      }
-    }
-
-    this.cleanup();
-    this.setState(ConnectionState.DISCONNECTED);
-    MediaNode.mediaNodes.delete(this.id);
-    this.emit('disconnected', { nodeId: this.id });
+    this.sendMessage(MSA.Connected, {
+      status: 'success',
+      nodeId: this.id,
+      message: 'Successfully connected to Media Signaling Server',
+    });
   }
 
   // Static methods for managing all nodes
@@ -427,11 +314,6 @@ class MediaNode extends EventEmitter {
     );
   }
 
-  static async disconnectAll(): Promise<void> {
-    const nodes = Array.from(MediaNode.mediaNodes.values());
-    await Promise.all(nodes.map(node => node.disconnect()));
-  }
-
   static getConnectionStats(): { [key: string]: number } {
     const stats: { [key: string]: number } = {};
     Object.values(ConnectionState).forEach(state => {
@@ -444,6 +326,14 @@ class MediaNode extends EventEmitter {
 
     return stats;
   }
+
+  private actionHandlers: {
+    [key in MSA]?: (args: { [key: string]: unknown }) => void;
+  } = {
+    connected: args => {
+      console.log(args);
+    },
+  };
 }
 
 export default MediaNode;
