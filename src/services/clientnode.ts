@@ -1,7 +1,6 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 
-import { ServiceEvents, SignallingEvents } from '../types/events';
 import { AckCallback, MessageData, PeerData, RoomInstanceData } from '../types';
 import Lobby from './lobby';
 import Visitor from './visitor';
@@ -10,6 +9,7 @@ import { redisServer } from '../servers/redis-server';
 import { getRedisKey } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
+import { ServiceActions, SignalingClientActions } from '../types/actions';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -43,7 +43,7 @@ class ClientNode extends EventEmitter {
       'message',
       (data: MessageData, callback: AckCallback) => {
         const { event, args } = data;
-        const handler = this.eventHandlers[event as SignallingEvents];
+        const handler = this.actionHandlers[event as SignalingClientActions];
         if (handler) handler(args, callback);
       }
     );
@@ -54,12 +54,12 @@ class ClientNode extends EventEmitter {
     this.closed = true;
     this.connection.disconnect(true);
     ClientNode.clientNodes.delete(this.connectionId);
-    this.emit(ServiceEvents.Close);
+    this.emit(ServiceActions.Close);
     this.removeAllListeners();
   }
 
-  private eventHandlers: {
-    [key in SignallingEvents]?: (
+  private actionHandlers: {
+    [key in SignalingClientActions]?: (
       args: { [key: string]: unknown },
       callback: AckCallback
     ) => void;

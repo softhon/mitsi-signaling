@@ -1,4 +1,4 @@
-export enum SignallingEvents {
+export enum SignalingClientActions {
   Message = 'message',
   Connected = 'connected',
   JoinRoom = 'join-room',
@@ -7,11 +7,17 @@ export enum SignallingEvents {
   GetRoomData = 'get-room-data',
   GetRtpCapabilities = 'get-rtp-capabilities',
 }
-export enum PubSubEvents {
+export enum PubSubActions {
   Message = 'message',
   EndMeeting = 'end-meeting',
 }
 
-export enum ServiceEvents {
+export enum ServiceActions {
   Close = 'close',
+}
+
+export enum MediaSignalingActions {
+  Connected = 'connected',
+  Heartbeat = 'heartbeat',
+  ServerShutdown = 'server-shutdown',
 }
