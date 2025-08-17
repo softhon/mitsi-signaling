@@ -33,7 +33,9 @@ let signalnodeData: SignalnodeData;
 
     // register signalnode
     signalnodeData = await registerSignalNode();
-    // new MediaNode({ ip: '0.0.0.0', host: '', id: '' });
+    console.log('Register signalnode');
+
+    MediaNode.connectToRunningNodes();
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);
@@ -49,7 +51,7 @@ const shutdown = async (): Promise<void> => {
       getRedisKey['signalnodesRunning'](),
       JSON.stringify(signalnodeData)
     );
-    console.log('Remove node');
+    console.log('Delete signalnode');
     await SocketServer.getInstance().close();
     await redisServer.disconnect();
     httpsServer.close();

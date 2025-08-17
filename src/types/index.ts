@@ -117,7 +117,8 @@ export interface ChatData {
 export interface MediaNodeData {
   id: string;
   ip: string;
-  host: string;
+  address: string;
+  grpcPort: string | number;
 }
 
 export interface Reaction {
