@@ -117,7 +117,8 @@ export interface ChatData {
 export interface MediaNodeData {
   id: string;
   ip: string;
-  host: string;
+  address: string;
+  grpcPort: string | number;
 }
 
 export interface Reaction {
@@ -127,4 +128,10 @@ export interface Reaction {
   peerName: string;
   position: `${number}%`;
   timestamp: number;
+}
+
+export interface SignalnodeData {
+  id: string;
+  ip: string;
+  address: string;
 }

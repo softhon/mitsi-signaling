@@ -1,5 +1,5 @@
 import z from 'zod';
-import { Role, Tag } from '../types/interfaces';
+import { Role, Tag } from '../types';
 
 const peerDataSchema = z.object({
   id: z.string(),

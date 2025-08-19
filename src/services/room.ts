@@ -1,8 +1,8 @@
 import EventEmitter from 'events';
 import Peer from './peer';
 import { redisServer } from '../servers/redis-server';
-import { PeerData, RoomData, RoomInstanceData } from '../types/interfaces';
-import { getKey } from '../utils/helpers';
+import { PeerData, RoomData, RoomInstanceData } from '../types';
+import { getRedisKey } from '../lib/utils';
 
 class Room extends EventEmitter {
   roomId: string;
@@ -84,7 +84,7 @@ class Room extends EventEmitter {
   static async create(roomId: string): Promise<Room> {
     try {
       // get room from redis if ongoing
-      const activeRoom = await redisServer.get(`room:${roomId}`);
+      const activeRoom = await redisServer.get(getRedisKey['room'](roomId));
 
       let roomInstanceData: RoomInstanceData;
 
@@ -121,7 +121,7 @@ class Room extends EventEmitter {
       }
       const room = new Room(roomInstanceData);
       await redisServer.set(
-        `room:${roomId}`,
+        getRedisKey['room'](roomId),
         JSON.stringify(roomInstanceData),
         { NX: true }
       );
@@ -150,7 +150,7 @@ class Room extends EventEmitter {
 
   async getPeersFromDB(): Promise<PeerData[]> {
     const members = await redisServer.sMembers(
-      getKey['roomPeers'](this.roomId)
+      getRedisKey['roomPeers'](this.roomId)
     );
 
     const peers: PeerData[] = [];
@@ -172,12 +172,12 @@ class Room extends EventEmitter {
     const peerData = peers.find(value => value.id === peer.id);
     if (!peerData) return;
     await redisServer.sRem(
-      getKey['roomPeers'](this.roomId),
+      getRedisKey['roomPeers'](this.roomId),
       JSON.stringify(peerData)
     );
 
     await redisServer.sAdd(
-      getKey['roomPeers'](this.roomId),
+      getRedisKey['roomPeers'](this.roomId),
       JSON.stringify({
         ...peer.getData(),
         ...value,
@@ -187,13 +187,13 @@ class Room extends EventEmitter {
 
   async getActiveSpeakerPeerId(): Promise<string | null> {
     const data = await redisServer.get(
-      getKey['roomActiveSpeakerPeerId'](this.roomId)
+      getRedisKey['roomActiveSpeakerPeerId'](this.roomId)
     );
     return data;
   }
 
   async getData(): Promise<RoomInstanceData | undefined> {
-    const data = await redisServer.get(getKey['room'](this.roomId));
+    const data = await redisServer.get(getRedisKey['room'](this.roomId));
     if (!data) return;
     const activeSpeakerPeerId = await this.getActiveSpeakerPeerId();
     return {

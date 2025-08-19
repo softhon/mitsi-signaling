@@ -1,6 +1,5 @@
 import { createServer } from 'https';
 import express from 'express';
-import fs from 'fs';
 import cors from 'cors';
 import helmet from 'helmet';
 
@@ -9,11 +8,9 @@ import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
 import MediaNode from './services/medianode';
-
-const serverOption = {
-  key: fs.readFileSync(config.tls.key, 'utf8'),
-  cert: fs.readFileSync(config.tls.cert, 'utf8'),
-};
+import { SignalnodeData } from './types';
+import { getRedisKey, registerSignalNode } from './lib/utils';
+// import { publicIpv4 } from 'public-ip';
 
 const app = express();
 app.use(cors(config.cors));
@@ -21,7 +18,9 @@ app.use(helmet());
 app.use(express.json());
 app.use('/', Routes);
 
-const httpsServer = createServer(serverOption, app);
+const httpsServer = createServer(config.httpsServerOptions, app);
+
+let signalnodeData: SignalnodeData;
 
 (async (): Promise<void> => {
   try {
@@ -32,15 +31,27 @@ const httpsServer = createServer(serverOption, app);
       console.log(`Server running on port ${config.port}`);
     });
 
-    new MediaNode({ ip: '0.0.0.0', host: '', id: '' });
+    // register signalnode
+    signalnodeData = await registerSignalNode();
+    console.log('Register signalnode');
+
+    MediaNode.connectToRunningNodes();
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);
   }
 })();
 
+// register/unregister signalnode
+
 const shutdown = async (): Promise<void> => {
   try {
+    // remove signal node
+    await redisServer.sRem(
+      getRedisKey['signalnodesRunning'](),
+      JSON.stringify(signalnodeData)
+    );
+    console.log('Delete signalnode');
     await SocketServer.getInstance().close();
     await redisServer.disconnect();
     httpsServer.close();

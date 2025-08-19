@@ -1,20 +1,18 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 
-import { ServiceEvents, SignallingEvents } from '../types/events';
-import {
-  AckCallback,
-  MessageData,
-  PeerData,
-  RoomInstanceData,
-} from '../types/interfaces';
+import { AckCallback, MessageData, PeerData, RoomInstanceData } from '../types';
 import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
-import { getKey } from '../utils/helpers';
+import { getRedisKey } from '../lib/utils';
 import Waiter from './waiter';
-import { ValidationSchema } from '../utils/schema';
+import { ValidationSchema } from '../lib/schema';
+import {
+  ServiceActions,
+  SignalingClientActions as SCA,
+} from '../types/actions';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -48,7 +46,7 @@ class ClientNode extends EventEmitter {
       'message',
       (data: MessageData, callback: AckCallback) => {
         const { event, args } = data;
-        const handler = this.eventHandlers[event as SignallingEvents];
+        const handler = this.actionHandlers[event as SCA];
         if (handler) handler(args, callback);
       }
     );
@@ -59,17 +57,17 @@ class ClientNode extends EventEmitter {
     this.closed = true;
     this.connection.disconnect(true);
     ClientNode.clientNodes.delete(this.connectionId);
-    this.emit(ServiceEvents.Close);
+    this.emit(ServiceActions.Close);
     this.removeAllListeners();
   }
 
-  private eventHandlers: {
-    [key in SignallingEvents]?: (
+  private actionHandlers: {
+    [key in SCA]?: (
       args: { [key: string]: unknown },
       callback: AckCallback
     ) => void;
   } = {
-    'join-visitors': async (args, callback) => {
+    [SCA.JoinVisitors]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerId.parse(args);
         const { roomId, peerId } = data;
@@ -81,13 +79,15 @@ class ClientNode extends EventEmitter {
           connection: this.connection,
         });
         lobby.addVisitor(visitor);
-        this.connection.join(getKey['lobby'](roomId));
+        this.connection.join(getRedisKey['lobby'](roomId));
         let room = Room.getRoom(roomId);
 
         if (!room) {
           // room could be running in another instance
           // find room in redis
-          const roomInstance = await redisServer.get(getKey['room'](roomId));
+          const roomInstance = await redisServer.get(
+            getRedisKey['room'](roomId)
+          );
 
           if (roomInstance) {
             room = await Room.create(roomId);
@@ -104,7 +104,7 @@ class ClientNode extends EventEmitter {
 
         // check if visitor was a participant
         const wasAParticipant = await redisServer.sIsMember(
-          getKey['roomPeerIds'](roomId),
+          getRedisKey['roomPeerIds'](roomId),
           peerId
         );
         const peers = await room.getPeersOnline();
@@ -126,13 +126,13 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'join-waiters': async (args, callback) => {
+    [SCA.JoinWaiters]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerIdPeerData.parse(args);
         const { roomId, peerId, peerData } = data;
 
         const wasAParticipant = await redisServer.sIsMember(
-          getKey['roomPeerIds'](roomId),
+          getRedisKey['roomPeerIds'](roomId),
           peerId
         );
 
@@ -162,7 +162,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'get-room-data': async (args, callback) => {
+    [SCA.GetRoomData]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomId.parse(args);
         const { roomId } = data;
@@ -177,7 +177,7 @@ class ClientNode extends EventEmitter {
             },
           });
         }
-        const redisData = await redisServer.get(getKey['room'](roomId));
+        const redisData = await redisServer.get(getRedisKey['room'](roomId));
 
         if (redisData) {
           const roomData: RoomInstanceData = JSON.parse(redisData);
@@ -199,7 +199,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'get-rtp-capabilities': (args, callback) => {
+    [SCA.GetRtpCapabilities]: (args, callback) => {
       try {
         // Todo implement medianode to complete
         return callback({ status: 'success' });
@@ -212,7 +212,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'join-room': (args, callback) => {
+    [SCA.JoinRoom]: (args, callback) => {
       try {
         // Todo implement medianode to complete
         return callback({ status: 'success' });
