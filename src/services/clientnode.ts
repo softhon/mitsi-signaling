@@ -9,7 +9,10 @@ import { redisServer } from '../servers/redis-server';
 import { getRedisKey } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
-import { ServiceActions, SignalingClientActions } from '../types/actions';
+import {
+  ServiceActions,
+  SignalingClientActions as SCA,
+} from '../types/actions';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -43,7 +46,7 @@ class ClientNode extends EventEmitter {
       'message',
       (data: MessageData, callback: AckCallback) => {
         const { event, args } = data;
-        const handler = this.actionHandlers[event as SignalingClientActions];
+        const handler = this.actionHandlers[event as SCA];
         if (handler) handler(args, callback);
       }
     );
@@ -59,12 +62,12 @@ class ClientNode extends EventEmitter {
   }
 
   private actionHandlers: {
-    [key in SignalingClientActions]?: (
+    [key in SCA]?: (
       args: { [key: string]: unknown },
       callback: AckCallback
     ) => void;
   } = {
-    'join-visitors': async (args, callback) => {
+    [SCA.JoinVisitors]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerId.parse(args);
         const { roomId, peerId } = data;
@@ -123,7 +126,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'join-waiters': async (args, callback) => {
+    [SCA.JoinWaiters]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerIdPeerData.parse(args);
         const { roomId, peerId, peerData } = data;
@@ -159,7 +162,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'get-room-data': async (args, callback) => {
+    [SCA.GetRoomData]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomId.parse(args);
         const { roomId } = data;
@@ -196,7 +199,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'get-rtp-capabilities': (args, callback) => {
+    [SCA.GetRtpCapabilities]: (args, callback) => {
       try {
         // Todo implement medianode to complete
         return callback({ status: 'success' });
@@ -209,7 +212,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    'join-room': (args, callback) => {
+    [SCA.JoinRoom]: (args, callback) => {
       try {
         // Todo implement medianode to complete
         return callback({ status: 'success' });

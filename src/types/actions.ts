@@ -1,15 +1,15 @@
 export enum SignalingClientActions {
   Message = 'message',
   Connected = 'connected',
-  JoinRoom = 'join-room',
-  JoinVisitors = 'join-visitors',
-  JoinWaiters = 'join-waiters',
-  GetRoomData = 'get-room-data',
-  GetRtpCapabilities = 'get-rtp-capabilities',
+  JoinRoom = 'join_room',
+  JoinVisitors = 'join_visitors',
+  JoinWaiters = 'join_waiters',
+  GetRoomData = 'get_room_data',
+  GetRtpCapabilities = 'get_rtp_capabilities',
 }
 export enum PubSubActions {
   Message = 'message',
-  EndMeeting = 'end-meeting',
+  EndMeeting = 'end_meeting',
 }
 
 export enum ServiceActions {
