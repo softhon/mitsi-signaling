@@ -5,7 +5,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 
 import { redisServer } from '../servers/redis-server';
-import { getRedisKey } from '../lib/utils';
+import { getRedisKey, parseArgs } from '../lib/utils';
 import { MediaNodeData } from '../types';
 import { ProtoGrpcType } from '../protos/gen/media-signaling';
 import { MediaSignalingClient } from '../protos/gen/mediaSignalingPackage/MediaSignaling';
@@ -856,19 +856,7 @@ class MediaNode extends EventEmitter {
 
       console.log(`📨 Received message from MediaNode ${this.id}: ${action}`);
 
-      let parsedArgs: { [key: string]: unknown } = {};
-      if (args) {
-        try {
-          parsedArgs = JSON.parse(args);
-        } catch (parseError) {
-          console.error(
-            `❌ Failed to parse message args from ${this.id}:`,
-            parseError
-          );
-          return;
-        }
-      }
-
+      const parsedArgs = parseArgs(args);
       // Handle system messages
       if (action === MSA.Heartbeat) {
         this.handleHeartbeat(parsedArgs);

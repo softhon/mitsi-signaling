@@ -10,6 +10,7 @@ export enum SignalingClientActions {
 export enum PubSubActions {
   Message = 'message',
   EndMeeting = 'end_meeting',
+
   RemovePeer = 'remove_peer',
 }
 
@@ -51,6 +52,8 @@ export enum MediaSignalingActions {
 
   // Custom actions placeholder
   Custom = 'custom',
+
+  CreatePeer = 'create_peer',
 
   RtpCapabilities = 'rtp_capabilities',
 }

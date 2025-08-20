@@ -23,29 +23,23 @@ class Peer extends Base {
   constructor({
     data,
     roomId,
-    hand,
-    peerId,
     connection,
     tag,
     roles,
     routerId,
-    isRecorder,
   }: {
     data: PeerData;
     roomId: string;
-    peerId: string;
-    hand?: HandState;
     connection: Socket;
     tag: Tag;
     roles: Role[];
     routerId: string;
-    isRecorder: boolean;
   }) {
-    super({ roomId, peerId, connection });
+    super({ roomId, peerId: data.id, connection });
     this.routerId = routerId;
     this.data = data;
-    this.isRecorder = isRecorder;
-    this.hand = hand ? hand : { raised: false };
+    this.isRecorder = data.isRecorder || false;
+    this.hand = data.hand ? data.hand : { raised: false };
     this.roles = roles;
     this.tag = tag;
     this.joined = Date.now();

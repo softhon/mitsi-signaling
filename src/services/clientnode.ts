@@ -1,20 +1,29 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 
-import { AckCallback, MessageData, PeerData, RoomInstanceData } from '../types';
+import {
+  AckCallback,
+  MessageData,
+  PeerData,
+  Role,
+  RoomInstanceData,
+  Tag,
+} from '../types';
 import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
-import { getPubSubChannel, getRedisKey } from '../lib/utils';
+import { getPubSubChannel, getRedisKey, parseArgs } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
 import {
   ServiceActions,
   SignalingClientActions as SCA,
   PubSubActions as PSA,
+  MediaSignalingActions as MSA,
 } from '../types/actions';
 import MediaNode from './medianode';
+import Peer from './peer';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -245,10 +254,53 @@ class ClientNode extends EventEmitter {
             });
           }
         }
-        // const medianode = MediaNode.getleastLoadedNode();
+        const medianode = MediaNode.getleastLoadedNode();
+        if (!medianode) throw 'No medianode found';
 
-        // const res = await
+        const messageRes = await medianode.sendMessageForResponse(
+          MSA.CreatePeer,
+          {
+            peerId: peerData.id,
+            roomId,
+            deviceRtpCapabilities,
+            peerType: peerData.isRecorder ? 'Recorder' : 'Participant',
+          }
+        );
 
+        if (!messageRes) throw 'No router res';
+
+        const value = parseArgs(messageRes.args);
+
+        const newPeer = new Peer({
+          roomId,
+          data: peerData as PeerData,
+          connection: this.connection,
+          routerId: value.routerId as string,
+          roles: [Role.Moderator],
+          tag: Tag.Host,
+        });
+
+        this.connection.join(`room-${roomId}`);
+        this.connection.data.roomId = roomId;
+        this.connection.data.peerId = newPeer.id;
+        this.connection.data.isRecorder = peerData.isRecorder || false;
+
+        const peersOnline = await room.getPeersOnline();
+        room.addPeer(newPeer);
+
+        const roomData = await room.getData();
+
+        const peers = newPeer.isRecorder
+          ? peersOnline
+          : [newPeer.getData(), ...peersOnline];
+
+        callback({
+          status: 'success',
+          response: {
+            peers,
+            roomData,
+          },
+        });
         // return callback({ status: 'success' });
       } catch (error) {
         console.error(`Error to join-room`, error);
