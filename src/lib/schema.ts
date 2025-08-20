@@ -56,6 +56,18 @@ export const ValidationSchema = {
   joinMeeting: z.object({
     roomId: z.string(),
     peerData: peerDataSchema,
-    rtpCapabilities: z.any(),
+    deviceRtpCapabilities: z.any(),
+  }),
+};
+
+export const MidialSignalingSchema = {
+  connected: z.object({
+    status: z.enum(['SUCCESS', 'FAILED']),
+    nodeId: z.string(),
+    connectionId: z.string(),
+    message: z.string(),
+    timestamp: z.number(),
+    serverMetrics: z.any(),
+    routerRtpCapabilities: z.any(),
   }),
 };

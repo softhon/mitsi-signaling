@@ -2,7 +2,7 @@ import EventEmitter from 'events';
 import Peer from './peer';
 import { redisServer } from '../servers/redis-server';
 import { PeerData, RoomData, RoomInstanceData } from '../types';
-import { getRedisKey } from '../lib/utils';
+import { getPubSubChannel, getRedisKey } from '../lib/utils';
 
 class Room extends EventEmitter {
   roomId: string;
@@ -78,6 +78,9 @@ class Room extends EventEmitter {
     clearInterval(this.selfDestructTimeout);
     clearTimeout(this.endCountDownInterval);
 
+    // unsubscribe from room pubsub
+    await redisServer.unsubscribe(getPubSubChannel['room'](this.roomId));
+
     this.removeAllListeners();
   }
 
@@ -125,6 +128,9 @@ class Room extends EventEmitter {
         JSON.stringify(roomInstanceData),
         { NX: true }
       );
+
+      // subcribe to room pubsubchannel
+      await redisServer.subscribe(getPubSubChannel['room'](roomId));
 
       return room;
     } catch (error) {

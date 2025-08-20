@@ -5,11 +5,12 @@ export enum SignalingClientActions {
   JoinVisitors = 'join_visitors',
   JoinWaiters = 'join_waiters',
   GetRoomData = 'get_room_data',
-  GetRtpCapabilities = 'get_rtp_capabilities',
+  GetRouterRtpCapabilities = 'get_router_rtp_capabilities',
 }
 export enum PubSubActions {
   Message = 'message',
   EndMeeting = 'end_meeting',
+  RemovePeer = 'remove_peer',
 }
 
 export enum ServiceActions {
@@ -50,4 +51,6 @@ export enum MediaSignalingActions {
 
   // Custom actions placeholder
   Custom = 'custom',
+
+  RtpCapabilities = 'rtp_capabilities',
 }

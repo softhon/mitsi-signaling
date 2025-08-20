@@ -6,13 +6,15 @@ import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
-import { getRedisKey } from '../lib/utils';
+import { getPubSubChannel, getRedisKey } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
 import {
   ServiceActions,
   SignalingClientActions as SCA,
+  PubSubActions as PSA,
 } from '../types/actions';
+import MediaNode from './medianode';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -199,12 +201,18 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.GetRtpCapabilities]: (args, callback) => {
+    [SCA.GetRouterRtpCapabilities]: (args, callback) => {
       try {
-        // Todo implement medianode to complete
-        return callback({ status: 'success' });
+        const medianode = MediaNode.getleastLoadedNode();
+        if (!medianode) throw 'No media services connected';
+        return callback({
+          status: 'success',
+          response: {
+            routerRtpCapabilities: medianode.getRouterRtpCapabilities(),
+          },
+        });
       } catch (error) {
-        console.error(`Error to join-waiters`, error);
+        console.error(`Error to ${SCA.GetRouterRtpCapabilities}`, error);
         callback({
           status: 'error',
           error,
@@ -212,10 +220,36 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.JoinRoom]: (args, callback) => {
+    [SCA.JoinRoom]: async (args, callback) => {
       try {
-        // Todo implement medianode to complete
-        return callback({ status: 'success' });
+        const data = ValidationSchema.joinMeeting.parse(args);
+        const { roomId, peerData, deviceRtpCapabilities } = data;
+        const room = Room.getRoom(roomId) ?? (await Room.create(roomId));
+
+        const peerExistingHere = room.getPeer(peerData.id);
+        if (peerExistingHere) {
+          peerExistingHere.close();
+        } else {
+          const peerExistingElseWhere = (await room.getPeersOnline()).find(
+            peer => peer.id === peerData.id
+          );
+          if (peerExistingElseWhere) {
+            await redisServer.publish({
+              channel: getPubSubChannel['room'](roomId),
+              action: PSA.RemovePeer,
+              args: {
+                roomId,
+                peerId: peerData.id,
+                silent: true,
+              },
+            });
+          }
+        }
+        // const medianode = MediaNode.getleastLoadedNode();
+
+        // const res = await
+
+        // return callback({ status: 'success' });
       } catch (error) {
         console.error(`Error to join-room`, error);
         callback({

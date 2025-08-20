@@ -16,6 +16,10 @@ export const getRedisKey = {
   roomSignalnodes: (roomId: string): string => `room-${roomId}-signalnodes`,
 };
 
+export const getPubSubChannel = {
+  room: (roomId: string): string => `room-${roomId}`,
+};
+
 export const registerSignalNode = async (): Promise<SignalnodeData> => {
   try {
     const { publicIpv4 } = await import('public-ip');
