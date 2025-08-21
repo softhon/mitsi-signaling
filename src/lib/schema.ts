@@ -41,6 +41,10 @@ export const ValidationSchema = {
     peerId: z.string(),
   }),
 
+  peerIds: z.object({
+    peerIds: z.array(z.string()),
+  }),
+
   roomId: z.object({
     roomId: z.string(),
   }),
@@ -57,6 +61,28 @@ export const ValidationSchema = {
     roomId: z.string(),
     peerData: peerDataSchema,
     deviceRtpCapabilities: z.any(),
+  }),
+
+  connectWebRtcTransport: z.object({
+    transportId: z.string(),
+    dtlsParameters: z.any(),
+  }),
+
+  createProducer: z.object({
+    transportId: z.string(),
+    kind: z.enum(['audio', 'video']),
+    rtpParameters: z.any(),
+    appData: z.any(),
+  }),
+
+  producer: z.object({
+    producerId: z.string(),
+    source: z.enum(['mic', 'camera', 'screen']),
+  }),
+
+  consumer: z.object({
+    consumerId: z.string(),
+    source: z.enum(['mic', 'camera', 'screen']),
   }),
 };
 
