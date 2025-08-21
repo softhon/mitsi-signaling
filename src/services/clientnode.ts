@@ -34,14 +34,14 @@ class ClientNode extends EventEmitter {
     this.closed = false;
 
     ClientNode.clientNodes.set(this.connectionId, this);
-    this.handleConnections();
+    this.handleConnection();
     console.info(
       'clientnode connected with connectionId - ',
       this.connectionId
     );
   }
 
-  handleConnections(): void {
+  handleConnection(): void {
     this.connection.on('connect_error', error => {
       console.error('client connection error', error);
     });
@@ -270,6 +270,7 @@ class ClientNode extends EventEmitter {
           roomId,
           data: peerData as PeerData,
           connection: this.connection,
+          medianode,
           routerId: value.routerId as string,
           roles: [Role.Moderator],
           tag: Tag.Host,
@@ -285,9 +286,7 @@ class ClientNode extends EventEmitter {
 
         const roomData = await room.getData();
 
-        const peers = newPeer.isRecorder
-          ? peersOnline
-          : [newPeer.getData(), ...peersOnline];
+        const peers = [newPeer.getData(), ...peersOnline];
 
         callback({
           status: 'success',
