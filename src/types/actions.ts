@@ -14,20 +14,29 @@ export enum Actions {
   CloseProducer = 'close_producer',
   PauseProducer = 'pause_producer',
   ResumeProducer = 'resume_producer',
+  ResumeConsumer = 'resume_consumer',
+  PauseConsumer = 'pause_consumer',
   RestartIce = 'restart_ice',
 
   CreatePeer = 'create_peer',
 
-  MuteAll = 'mute_all',
   Mute = 'mute',
   OffCamera = 'off_camera',
   StopScreen = 'stop_screen',
   RaiseHand = 'raise_hand',
   LowerHands = 'lower_hands',
-  SendEmoji = 'send_emoji',
+  SendChat = 'send_chat',
+  SendReaction = 'send_reaction',
+  GetWaiters = 'get_waiters',
+  AdmitWaiters = 'admit_waiters',
+  DeclineWaiters = 'decline_waiters',
+  Record = 'Record',
+
+  RemovePeer = 'remove_peer',
+  AddRole = 'add_role',
+  RemoveRole = 'remove_role',
 
   EndMeeting = 'end_meeting',
-  RemovePeer = 'remove_peer',
 
   Heartbeat = 'heartbeat',
   HeartbeatAck = 'heartbeat_ack',
