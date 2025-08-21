@@ -40,7 +40,7 @@ export interface HandState {
 }
 
 export interface MessageData {
-  event: string;
+  action: string;
   args: { [key: string]: unknown };
 }
 

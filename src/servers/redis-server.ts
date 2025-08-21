@@ -1,6 +1,6 @@
 import { createClient, RedisClientType, SetOptions } from 'redis';
 
-import { PubSubActions as PSA } from '../types/actions';
+import { Actions as PSA } from '../types/actions';
 import config from '../config';
 
 class RedisServer {

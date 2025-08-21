@@ -16,12 +16,7 @@ import { redisServer } from '../servers/redis-server';
 import { getPubSubChannel, getRedisKey, parseArgs } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
-import {
-  ServiceActions,
-  SignalingClientActions as SCA,
-  PubSubActions as PSA,
-  MediaSignalingActions as MSA,
-} from '../types/actions';
+import { Actions } from '../types/actions';
 import MediaNode from './medianode';
 import Peer from './peer';
 
@@ -56,8 +51,8 @@ class ClientNode extends EventEmitter {
     this.connection.on(
       'message',
       (data: MessageData, callback: AckCallback) => {
-        const { event, args } = data;
-        const handler = this.actionHandlers[event as SCA];
+        const { action, args } = data;
+        const handler = this.actionHandlers[action as Actions];
         if (handler) handler(args, callback);
       }
     );
@@ -68,17 +63,17 @@ class ClientNode extends EventEmitter {
     this.closed = true;
     this.connection.disconnect(true);
     ClientNode.clientNodes.delete(this.connectionId);
-    this.emit(ServiceActions.Close);
+    this.emit(Actions.Close);
     this.removeAllListeners();
   }
 
   private actionHandlers: {
-    [key in SCA]?: (
+    [key in Actions]?: (
       args: { [key: string]: unknown },
       callback: AckCallback
     ) => void;
   } = {
-    [SCA.JoinVisitors]: async (args, callback) => {
+    [Actions.JoinVisitors]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerId.parse(args);
         const { roomId, peerId } = data;
@@ -137,7 +132,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.JoinWaiters]: async (args, callback) => {
+    [Actions.JoinWaiters]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerIdPeerData.parse(args);
         const { roomId, peerId, peerData } = data;
@@ -173,7 +168,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.GetRoomData]: async (args, callback) => {
+    [Actions.GetRoomData]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomId.parse(args);
         const { roomId } = data;
@@ -210,7 +205,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.GetRouterRtpCapabilities]: (args, callback) => {
+    [Actions.GetRouterRtpCapabilities]: (args, callback) => {
       try {
         const medianode = MediaNode.getleastLoadedNode();
         if (!medianode) throw 'No media services connected';
@@ -221,7 +216,7 @@ class ClientNode extends EventEmitter {
           },
         });
       } catch (error) {
-        console.error(`Error to ${SCA.GetRouterRtpCapabilities}`, error);
+        console.error(`Error to ${Actions.GetRouterRtpCapabilities}`, error);
         callback({
           status: 'error',
           error,
@@ -229,7 +224,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.JoinRoom]: async (args, callback) => {
+    [Actions.JoinRoom]: async (args, callback) => {
       try {
         const data = ValidationSchema.joinMeeting.parse(args);
         const { roomId, peerData, deviceRtpCapabilities } = data;
@@ -245,7 +240,7 @@ class ClientNode extends EventEmitter {
           if (peerExistingElseWhere) {
             await redisServer.publish({
               channel: getPubSubChannel['room'](roomId),
-              action: PSA.RemovePeer,
+              action: Actions.RemovePeer,
               args: {
                 roomId,
                 peerId: peerData.id,
@@ -258,7 +253,7 @@ class ClientNode extends EventEmitter {
         if (!medianode) throw 'No medianode found';
 
         const messageRes = await medianode.sendMessageForResponse(
-          MSA.CreatePeer,
+          Actions.CreatePeer,
           {
             peerId: peerData.id,
             roomId,

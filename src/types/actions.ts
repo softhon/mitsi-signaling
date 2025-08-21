@@ -1,30 +1,34 @@
-export enum SignalingClientActions {
+export enum Actions {
   Message = 'message',
   Connected = 'connected',
   JoinRoom = 'join_room',
   JoinVisitors = 'join_visitors',
   JoinWaiters = 'join_waiters',
   GetRoomData = 'get_room_data',
+
   GetRouterRtpCapabilities = 'get_router_rtp_capabilities',
-}
-export enum PubSubActions {
-  Message = 'message',
+  CreateWebrtcTransports = 'create_webrtc_transports',
+  ConnectWebrtcTransports = 'connect_webrtc_transports',
+  CreateConsumersOfAllProducers = 'create_consumers_of_all_producers',
+  CreateProducer = 'create_producer',
+  CloseProducer = 'close_producer',
+  PauseProducer = 'pause_producer',
+  ResumeProducer = 'resume_producer',
+  RestartIce = 'restart_ice',
+
+  CreatePeer = 'create_peer',
+
+  MuteAll = 'mute_all',
+  Mute = 'mute',
+  OffCamera = 'off_camera',
+  StopScreen = 'stop_screen',
+  RaiseHand = 'raise_hand',
+  LowerHands = 'lower_hands',
+  SendEmoji = 'send_emoji',
+
   EndMeeting = 'end_meeting',
-
   RemovePeer = 'remove_peer',
-}
 
-export enum ServiceActions {
-  Close = 'close',
-}
-
-export enum MediaSignalingActions {
-  // Connection lifecycle
-  Connected = 'connected',
-  Disconnect = 'disconnect',
-  Reconnect = 'reconnect',
-
-  // Health monitoring
   Heartbeat = 'heartbeat',
   HeartbeatAck = 'heartbeat_ack',
   Ping = 'ping',
@@ -38,22 +42,5 @@ export enum MediaSignalingActions {
   Error = 'error',
   ConnectionError = 'connection_error',
 
-  // Media specific actions (add your custom actions here)
-  MediaOffer = 'media_offer',
-  MediaAnswer = 'media_answer',
-  IceCandidate = 'ice_candidate',
-  MediaStreamStart = 'media_stream_start',
-  MediaStreamStop = 'media_stream_stop',
-
-  // Room/channel management
-  JoinRoom = 'join_room',
-  LeaveRoom = 'leave_room',
-  RoomUpdate = 'room_update',
-
-  // Custom actions placeholder
-  Custom = 'custom',
-
-  CreatePeer = 'create_peer',
-
-  RtpCapabilities = 'rtp_capabilities',
+  Close = 'close',
 }

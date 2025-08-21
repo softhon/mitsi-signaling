@@ -12,7 +12,7 @@ import { MediaSignalingClient } from '../protos/gen/mediaSignalingPackage/MediaS
 import { MessageRequest } from '../protos/gen/mediaSignalingPackage/MessageRequest';
 import { MessageResponse } from '../protos/gen/mediaSignalingPackage/MessageResponse';
 import config from '../config';
-import { MediaSignalingActions as MSA } from '../types/actions';
+import { Actions as MSA } from '../types/actions';
 
 const PROTO_FILE = path.resolve(__dirname, '../protos/media-signaling.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_FILE, {
