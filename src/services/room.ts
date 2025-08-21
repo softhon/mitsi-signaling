@@ -150,6 +150,11 @@ class Room extends EventEmitter {
   getPeer(peerId: string): Peer | undefined {
     return this.peers.get(peerId);
   }
+  // peers in this room instance
+  getPeers(): Peer[] {
+    return Array.from(this.peers.values());
+  }
+
   removePeer(peerId: string): void {
     this.peers.delete(peerId);
   }
