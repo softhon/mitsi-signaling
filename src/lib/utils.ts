@@ -3,17 +3,21 @@ import { redisServer } from '../servers/redis-server';
 import { SignalnodeData } from '../types';
 
 export const getRedisKey = {
-  room: (roomId: string): string => `room-${roomId}`,
-  lobby: (roomId: string): string => `lobby-${roomId}`,
-  roomPeers: (roomId: string): string => `room-${roomId}-peers`,
-  roomPeerIds: (roomId: string): string => `room-${roomId}-peerids`,
+  room: (roomId: string): string => `room:${roomId}`,
+  lobby: (roomId: string): string => `lobby:${roomId}`,
+  roomPeers: (roomId: string): string => `room:${roomId}:peers`,
+  roomPeerIds: (roomId: string): string => `room:${roomId}:peerids`,
   roomActiveSpeakerPeerId: (roomId: string): string =>
-    `room-${roomId}-activespeakerpeerid`,
-  roomsOngoing: (): string => `rooms-ongoing`,
-  medianodesRunning: (): string => `medianodes-running`,
-  signalnodesRunning: (): string => `signalnodes-running`,
-  roomMedianodes: (roomId: string): string => `room-${roomId}-medianodes`,
-  roomSignalnodes: (roomId: string): string => `room-${roomId}-signalnodes`,
+    `room:${roomId}:activespeakerpeerid`,
+  roomsOngoing: (): string => `rooms:ongoing`,
+  medianodesRunning: (): string => `medianodes:running`,
+  signalnodesRunning: (): string => `signalnodes:running`,
+  roomMedianodes: (roomId: string): string => `room:${roomId}:medianodes`,
+  roomSignalnodes: (roomId: string): string => `room:${roomId}:signalnodes`,
+};
+
+export const getPubSubChannel = {
+  room: (roomId: string): string => `room-${roomId}`,
 };
 
 export const registerSignalNode = async (): Promise<SignalnodeData> => {
@@ -33,4 +37,16 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
   } catch (error) {
     throw error;
   }
+};
+
+export const parseArgs = (args?: string): { [key: string]: unknown } => {
+  let parsedArgs: { [key: string]: unknown } = {};
+  if (args) {
+    try {
+      parsedArgs = JSON.parse(args);
+    } catch (parseError) {
+      throw parseError;
+    }
+  }
+  return parsedArgs;
 };

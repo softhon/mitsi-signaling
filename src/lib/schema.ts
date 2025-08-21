@@ -41,6 +41,10 @@ export const ValidationSchema = {
     peerId: z.string(),
   }),
 
+  peerIds: z.object({
+    peerIds: z.array(z.string()),
+  }),
+
   roomId: z.object({
     roomId: z.string(),
   }),
@@ -56,6 +60,40 @@ export const ValidationSchema = {
   joinMeeting: z.object({
     roomId: z.string(),
     peerData: peerDataSchema,
-    rtpCapabilities: z.any(),
+    deviceRtpCapabilities: z.any(),
+  }),
+
+  connectWebRtcTransport: z.object({
+    transportId: z.string(),
+    dtlsParameters: z.any(),
+  }),
+
+  createProducer: z.object({
+    transportId: z.string(),
+    kind: z.enum(['audio', 'video']),
+    rtpParameters: z.any(),
+    appData: z.any(),
+  }),
+
+  producer: z.object({
+    producerId: z.string(),
+    source: z.enum(['mic', 'camera', 'screen']),
+  }),
+
+  consumer: z.object({
+    consumerId: z.string(),
+    source: z.enum(['mic', 'camera', 'screen']),
+  }),
+};
+
+export const MidialSignalingSchema = {
+  connected: z.object({
+    status: z.enum(['SUCCESS', 'FAILED']),
+    nodeId: z.string(),
+    connectionId: z.string(),
+    message: z.string(),
+    timestamp: z.number(),
+    serverMetrics: z.any(),
+    routerRtpCapabilities: z.any(),
   }),
 };

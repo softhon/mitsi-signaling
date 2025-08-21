@@ -1,7 +1,7 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 import { MessageData } from '../types';
-import { SignalingClientActions } from '../types/actions';
+import { Actions } from '../types/actions';
 
 abstract class Base extends EventEmitter {
   id: string;
@@ -43,14 +43,12 @@ abstract class Base extends EventEmitter {
     includeMe?: boolean;
   }): void {
     if (broadcast) {
-      this.connection.broadcast
-        .to(this.roomId)
-        .emit(SignalingClientActions.Message, message);
+      this.connection.broadcast.to(this.roomId).emit(Actions.Message, message);
       if (includeMe) {
-        this.connection.emit(SignalingClientActions.Message, message);
+        this.connection.emit(Actions.Message, message);
       }
     } else {
-      this.connection.emit(SignalingClientActions.Message, message);
+      this.connection.emit(Actions.Message, message);
     }
   }
 }

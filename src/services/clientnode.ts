@@ -1,18 +1,24 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 
-import { AckCallback, MessageData, PeerData, RoomInstanceData } from '../types';
+import {
+  AckCallback,
+  MessageData,
+  PeerData,
+  Role,
+  RoomInstanceData,
+  Tag,
+} from '../types';
 import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
-import { getRedisKey } from '../lib/utils';
+import { getPubSubChannel, getRedisKey, parseArgs } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
-import {
-  ServiceActions,
-  SignalingClientActions as SCA,
-} from '../types/actions';
+import { Actions } from '../types/actions';
+import MediaNode from './medianode';
+import Peer from './peer';
 
 class ClientNode extends EventEmitter {
   connectionId: string;
@@ -28,14 +34,14 @@ class ClientNode extends EventEmitter {
     this.closed = false;
 
     ClientNode.clientNodes.set(this.connectionId, this);
-    this.handleConnections();
+    this.handleConnection();
     console.info(
       'clientnode connected with connectionId - ',
       this.connectionId
     );
   }
 
-  handleConnections(): void {
+  handleConnection(): void {
     this.connection.on('connect_error', error => {
       console.error('client connection error', error);
     });
@@ -45,8 +51,8 @@ class ClientNode extends EventEmitter {
     this.connection.on(
       'message',
       (data: MessageData, callback: AckCallback) => {
-        const { event, args } = data;
-        const handler = this.actionHandlers[event as SCA];
+        const { action, args } = data;
+        const handler = this.actionHandlers[action as Actions];
         if (handler) handler(args, callback);
       }
     );
@@ -57,17 +63,17 @@ class ClientNode extends EventEmitter {
     this.closed = true;
     this.connection.disconnect(true);
     ClientNode.clientNodes.delete(this.connectionId);
-    this.emit(ServiceActions.Close);
+    this.emit(Actions.Close);
     this.removeAllListeners();
   }
 
   private actionHandlers: {
-    [key in SCA]?: (
+    [key in Actions]?: (
       args: { [key: string]: unknown },
       callback: AckCallback
     ) => void;
   } = {
-    [SCA.JoinVisitors]: async (args, callback) => {
+    [Actions.JoinVisitors]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerId.parse(args);
         const { roomId, peerId } = data;
@@ -126,7 +132,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.JoinWaiters]: async (args, callback) => {
+    [Actions.JoinWaiters]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomIdPeerIdPeerData.parse(args);
         const { roomId, peerId, peerData } = data;
@@ -162,7 +168,7 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.GetRoomData]: async (args, callback) => {
+    [Actions.GetRoomData]: async (args, callback) => {
       try {
         const data = ValidationSchema.roomId.parse(args);
         const { roomId } = data;
@@ -199,12 +205,18 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.GetRtpCapabilities]: (args, callback) => {
+    [Actions.GetRouterRtpCapabilities]: (args, callback) => {
       try {
-        // Todo implement medianode to complete
-        return callback({ status: 'success' });
+        const medianode = MediaNode.getleastLoadedNode();
+        if (!medianode) throw 'No media services connected';
+        return callback({
+          status: 'success',
+          response: {
+            routerRtpCapabilities: medianode.getRouterRtpCapabilities(),
+          },
+        });
       } catch (error) {
-        console.error(`Error to join-waiters`, error);
+        console.error(`Error to ${Actions.GetRouterRtpCapabilities}`, error);
         callback({
           status: 'error',
           error,
@@ -212,10 +224,78 @@ class ClientNode extends EventEmitter {
       }
     },
 
-    [SCA.JoinRoom]: (args, callback) => {
+    [Actions.JoinRoom]: async (args, callback) => {
       try {
-        // Todo implement medianode to complete
-        return callback({ status: 'success' });
+        const data = ValidationSchema.joinMeeting.parse(args);
+        const { roomId, peerData, deviceRtpCapabilities } = data;
+        const room = Room.getRoom(roomId) ?? (await Room.create(roomId));
+
+        const peerExistingHere = room.getPeer(peerData.id);
+        if (peerExistingHere) {
+          peerExistingHere.close();
+        } else {
+          const peerExistingElseWhere = (await room.getPeersOnline()).find(
+            peer => peer.id === peerData.id
+          );
+          if (peerExistingElseWhere) {
+            await redisServer.publish({
+              channel: getPubSubChannel['room'](roomId),
+              action: Actions.RemovePeer,
+              args: {
+                roomId,
+                peerId: peerData.id,
+                silent: true,
+              },
+            });
+          }
+        }
+        const medianode = MediaNode.getleastLoadedNode();
+        if (!medianode) throw 'No medianode found';
+
+        const messageRes = await medianode.sendMessageForResponse(
+          Actions.CreatePeer,
+          {
+            peerId: peerData.id,
+            roomId,
+            deviceRtpCapabilities,
+            peerType: peerData.isRecorder ? 'Recorder' : 'Participant',
+          }
+        );
+
+        if (!messageRes) throw 'No router res';
+
+        const value = parseArgs(messageRes.args);
+
+        const newPeer = new Peer({
+          roomId,
+          data: peerData as PeerData,
+          connection: this.connection,
+          medianode,
+          routerId: value.routerId as string,
+          roles: [Role.Moderator],
+          tag: Tag.Host,
+        });
+
+        this.connection.join(`room-${roomId}`);
+        this.connection.data.roomId = roomId;
+        this.connection.data.peerId = newPeer.id;
+        this.connection.data.isRecorder = peerData.isRecorder || false;
+
+        const peersOnline = await room.getPeersOnline();
+        room.addPeer(newPeer);
+
+        const roomData = await room.getData();
+
+        const peers = [newPeer.getData(), ...peersOnline];
+
+        callback({
+          status: 'success',
+          response: {
+            peers,
+            roomData,
+          },
+        });
+        // return callback({ status: 'success' });
       } catch (error) {
         console.error(`Error to join-room`, error);
         callback({
