@@ -12,7 +12,7 @@ import { MediaSignalingClient } from '../protos/gen/mediaSignalingPackage/MediaS
 import { MessageRequest } from '../protos/gen/mediaSignalingPackage/MessageRequest';
 import { MessageResponse } from '../protos/gen/mediaSignalingPackage/MessageResponse';
 import config from '../config';
-import { Actions as MSA } from '../types/actions';
+import { Actions, Actions as MSA } from '../types/actions';
 
 const PROTO_FILE = path.resolve(__dirname, '../protos/media-signaling.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_FILE, {
@@ -197,9 +197,7 @@ class MediaNode extends EventEmitter {
 
   static async connectToRunningNodes(): Promise<MediaNode[]> {
     try {
-      const redisData = await redisServer.sMembers(
-        getRedisKey['medianodesRunning']()
-      );
+      const redisData = await redisServer.sMembers(getRedisKey['medianodes']());
 
       if (!redisData.length) {
         console.log('📭 No running media nodes found in Redis');
@@ -934,7 +932,7 @@ class MediaNode extends EventEmitter {
     // Send disconnect message if connected
     if (this.isConnected) {
       try {
-        this.sendMessage(MSA.Disconnect, {
+        this.sendMessage(Actions.Disconnect, {
           reason: 'client_disconnect',
           connectionId: this.connectionId,
           timestamp: Date.now(),

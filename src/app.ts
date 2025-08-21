@@ -48,7 +48,7 @@ const shutdown = async (): Promise<void> => {
   try {
     // remove signal node
     await redisServer.sRem(
-      getRedisKey['signalnodesRunning'](),
+      getRedisKey['signalnodes'](),
       JSON.stringify(signalnodeData)
     );
     console.log('Delete signalnode');
