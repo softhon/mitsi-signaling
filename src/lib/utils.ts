@@ -9,9 +9,9 @@ export const getRedisKey = {
   roomPeerIds: (roomId: string): string => `room:${roomId}:peerids`,
   roomActiveSpeakerPeerId: (roomId: string): string =>
     `room:${roomId}:activespeakerpeerid`,
-  roomsOngoing: (): string => `rooms:ongoing`,
-  medianodesRunning: (): string => `medianodes:running`,
-  signalnodesRunning: (): string => `signalnodes:running`,
+  rooms: (): string => `rooms`,
+  medianodes: (): string => `medianodes`,
+  signalnodes: (): string => `signalnodes`,
   roomMedianodes: (roomId: string): string => `room:${roomId}:medianodes`,
   roomSignalnodes: (roomId: string): string => `room:${roomId}:signalnodes`,
 };
@@ -25,12 +25,12 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
     const { publicIpv4 } = await import('public-ip');
     const ip = await publicIpv4();
     const signalnodeData: SignalnodeData = {
-      id: ip || config.nodeId,
+      id: config.nodeId,
       ip,
       address: `${config.port}`,
     };
     await redisServer.sAdd(
-      getRedisKey['signalnodesRunning'](),
+      getRedisKey['signalnodes'](),
       JSON.stringify(signalnodeData)
     );
     return signalnodeData;
@@ -39,7 +39,7 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
   }
 };
 
-export const parseArgs = (args?: string): { [key: string]: unknown } => {
+export const parseArguments = (args?: string): { [key: string]: unknown } => {
   let parsedArgs: { [key: string]: unknown } = {};
   if (args) {
     try {

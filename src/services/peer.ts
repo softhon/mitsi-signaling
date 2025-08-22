@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { Actions } from '../types/actions';
 import MediaNode from './medianode';
-import { getPubSubChannel, parseArgs } from '../lib/utils';
+import { getPubSubChannel, parseArguments } from '../lib/utils';
 import { ValidationSchema } from '../lib/schema';
 import { redisServer } from '../servers/redis-server';
 import Room from './room';
@@ -116,9 +116,7 @@ class Peer extends Base {
             roomId,
           }
         );
-        if (!messageRes) throw 'sendMessageForResponse returned null';
-
-        const transportParams = parseArgs(messageRes.args);
+        const transportParams = parseArguments(messageRes.args);
         callback({
           status: 'success',
           response: transportParams,
@@ -137,12 +135,15 @@ class Peer extends Base {
         const data = ValidationSchema.connectWebRtcTransport.parse(args);
         const { dtlsParameters, transportId } = data;
 
-        this.medianode.sendMessage(Actions.ConnectWebrtcTransports, {
-          peerId,
-          roomId,
-          dtlsParameters,
-          transportId,
-        });
+        await this.medianode.sendMessageForResponse(
+          Actions.ConnectWebrtcTransports,
+          {
+            peerId,
+            roomId,
+            dtlsParameters,
+            transportId,
+          }
+        );
 
         callback({
           status: 'success',
@@ -160,10 +161,13 @@ class Peer extends Base {
       try {
         const { roomId, peerId } = this.connection.data;
 
-        this.medianode.sendMessage(Actions.CreateConsumersOfAllProducers, {
-          peerId,
-          roomId,
-        });
+        await this.medianode.sendMessageForResponse(
+          Actions.CreateConsumersOfAllProducers,
+          {
+            peerId,
+            roomId,
+          }
+        );
 
         callback({
           status: 'success',
@@ -196,7 +200,7 @@ class Peer extends Base {
         );
         if (!messageRes) throw 'sendMessageForResponse returned null';
 
-        const { producerId } = parseArgs(messageRes.args);
+        const { producerId } = parseArguments(messageRes.args);
 
         callback({
           status: 'success',

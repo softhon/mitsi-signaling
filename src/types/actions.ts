@@ -1,6 +1,7 @@
 export enum Actions {
   Message = 'message',
   Connected = 'connected',
+  Disconnect = 'disconnect',
   JoinRoom = 'join_room',
   JoinVisitors = 'join_visitors',
   JoinWaiters = 'join_waiters',

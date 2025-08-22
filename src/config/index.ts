@@ -11,7 +11,7 @@ const keyFile =
   process.env.HTTPS_KEY || path.join(__dirname, '..', 'certs', 'privkey.pem');
 
 const config = {
-  nodeId: `snode-${crypto.randomUUID()}`,
+  nodeId: `snode-1`,
   env: process.env.NODE_ENV,
   cors: {
     origin: process.env.NODE_ENV === 'production' ? ['https://mitsi.app'] : '*',
