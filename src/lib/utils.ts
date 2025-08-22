@@ -39,7 +39,7 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
   }
 };
 
-export const parseArgs = (args?: string): { [key: string]: unknown } => {
+export const parseArguments = (args?: string): { [key: string]: unknown } => {
   let parsedArgs: { [key: string]: unknown } = {};
   if (args) {
     try {

@@ -13,7 +13,7 @@ import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
-import { getPubSubChannel, getRedisKey, parseArgs } from '../lib/utils';
+import { getPubSubChannel, getRedisKey, parseArguments } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
 import { Actions } from '../types/actions';
@@ -262,16 +262,14 @@ class ClientNode extends EventEmitter {
           }
         );
 
-        if (!messageRes) throw 'No router res';
-
-        const value = parseArgs(messageRes.args);
+        const { routerId } = parseArguments(messageRes.args);
 
         const newPeer = new Peer({
           roomId,
           data: peerData as PeerData,
           connection: this.connection,
           medianode,
-          routerId: value.routerId as string,
+          routerId: routerId as string,
           roles: [Role.Moderator],
           tag: Tag.Host,
         });

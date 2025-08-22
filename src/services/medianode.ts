@@ -5,14 +5,14 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 
 import { redisServer } from '../servers/redis-server';
-import { getRedisKey, parseArgs } from '../lib/utils';
-import { MediaNodeData } from '../types';
+import { getRedisKey, parseArguments as parseArguments } from '../lib/utils';
+import { MediaNodeData, PendingRequest } from '../types';
 import { ProtoGrpcType } from '../protos/gen/media-signaling';
 import { MediaSignalingClient } from '../protos/gen/mediaSignalingPackage/MediaSignaling';
 import { MessageRequest } from '../protos/gen/mediaSignalingPackage/MessageRequest';
 import { MessageResponse } from '../protos/gen/mediaSignalingPackage/MessageResponse';
 import config from '../config';
-import { Actions, Actions as MSA } from '../types/actions';
+import { Actions } from '../types/actions';
 
 const PROTO_FILE = path.resolve(__dirname, '../protos/media-signaling.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_FILE, {
@@ -81,7 +81,7 @@ class MediaNode extends EventEmitter {
   private readonly messageTimeout: number = 30000;
 
   // implemented to get immediate response to request/stream
-  private pendingRequests: Map<string, (response: MessageResponse) => void>;
+  private pendingRequests: Map<string, PendingRequest>;
   private static mediaNodes = new Map<string, MediaNode>();
 
   constructor({
@@ -474,7 +474,7 @@ class MediaNode extends EventEmitter {
       });
 
       // Send initial connection message
-      this.sendMessage(MSA.Connected, {
+      this.sendMessage(Actions.Connected, {
         status: 'success',
         nodeId: this.clientId,
         connectionId: this.connectionId,
@@ -484,7 +484,7 @@ class MediaNode extends EventEmitter {
 
       console.log('sendMessageForResponse - 1');
 
-      const pingResponse = await this.sendMessageForResponse(MSA.Ping, {
+      const pingResponse = await this.sendMessageForResponse(Actions.Ping, {
         timestamp: Date.now(),
         connectionId: this.connectionId,
       });
@@ -574,7 +574,7 @@ class MediaNode extends EventEmitter {
   }
 
   // Message handling
-  sendMessage(action: MSA, args?: { [key: string]: unknown }): boolean {
+  sendMessage(action: Actions, args?: { [key: string]: unknown }): boolean {
     if (!this.grpcCall) {
       console.warn(
         `⚠️  Cannot send message to MediaNode ${this.id}: not connected`
@@ -601,17 +601,14 @@ class MediaNode extends EventEmitter {
   }
 
   async sendMessageForResponse(
-    action: MSA,
+    action: Actions,
     args?: { [key: string]: unknown }
-  ): Promise<MessageResponse | null> {
-    if (!this.grpcCall) {
-      console.warn(
-        `⚠️  Cannot send message to MediaNode ${this.id}: not connected`
-      );
-      return null;
-    }
-
+  ): Promise<MessageResponse> {
     try {
+      if (!this.grpcCall) {
+        throw `⚠️  Cannot send message to MediaNode ${this.id}: not connected`;
+      }
+
       const requestId = crypto.randomUUID();
 
       const message: MessageRequest = {
@@ -620,14 +617,17 @@ class MediaNode extends EventEmitter {
         requestId,
       };
 
-      return new Promise<MessageResponse>(resolve => {
+      return new Promise<MessageResponse>((resolve, reject) => {
         if (this.grpcCall) {
-          this.pendingRequests.set(requestId, resolve); // save resolve
+          this.pendingRequests.set(requestId, {
+            resolve,
+            reject,
+          }); // save resolve
           this.grpcCall.write(message);
         }
       });
     } catch (error) {
-      console.error(`❌ Error sending message to MediaNode ${this.id}:`, error);
+      console.error(`Error sending message to MediaNode ${this.id}:`, error);
       throw error;
     }
   }
@@ -680,39 +680,43 @@ class MediaNode extends EventEmitter {
   private handleIncomingMessage(message: MessageResponse): void {
     try {
       const { action, args, requestId } = message;
+      if (!action) return;
+
+      const parsedArgs = parseArguments(args);
 
       if (requestId?.length) {
-        const resolver = this.pendingRequests.get(requestId);
-        if (resolver) {
+        console.log('Got a request expecting response');
+        const pendingRequest = this.pendingRequests.get(requestId);
+        if (pendingRequest) {
           // this means this instance initiated this request for response .
           // resolve and return
-          resolver(message);
+          if (parsedArgs.status === 'error') {
+            console.log(action, 'pending request Returned error');
+            pendingRequest.reject(parsedArgs.error as Error);
+          } else {
+            console.log(action, 'pending request Returned success');
+            pendingRequest.resolve(message);
+          }
           this.pendingRequests.delete(requestId);
           return;
         }
       }
 
-      if (!action) {
-        console.warn(`⚠️  Received message without action from ${this.id}`);
-        return;
-      }
+      console.log(`Received message from MediaNode ${this.id}: ${action}`);
 
-      console.log(`📨 Received message from MediaNode ${this.id}: ${action}`);
-
-      const parsedArgs = parseArgs(args);
       // Handle system messages
-      if (action === MSA.Heartbeat) {
+      if (action === Actions.Heartbeat) {
         this.handleHeartbeat(parsedArgs);
         return;
       }
 
-      if (action === MSA.ServerShutdown) {
+      if (action === Actions.ServerShutdown) {
         this.handleServerShutdown(parsedArgs);
         return;
       }
 
       // Find and execute handler
-      const handler = this.actionHandlers[action as MSA];
+      const handler = this.actionHandlers[action as Actions];
       if (handler) {
         try {
           handler(parsedArgs, requestId);
@@ -745,7 +749,7 @@ class MediaNode extends EventEmitter {
   private handleHeartbeat(args: { [key: string]: unknown }): void {
     console.log(args);
     // Respond to heartbeat
-    this.sendMessage(MSA.HeartbeatAck, {
+    this.sendMessage(Actions.HeartbeatAck, {
       timestamp: Date.now(),
       connectionId: this.connectionId,
     });
@@ -877,27 +881,27 @@ class MediaNode extends EventEmitter {
 
   // Action handlers for different message types
   private actionHandlers: {
-    [key in MSA]?: (
+    [key in Actions]?: (
       args: { [key: string]: unknown },
       requestId?: string
     ) => void;
   } = {
-    [MSA.Connected]: args => {
+    [Actions.Connected]: args => {
       // console.log(`✅ Connection confirmed from node ${this.id}:`, args);
       this.emit('connectionConfirmed', { nodeId: this.id, args });
       this.routerRtpCapabilities =
         args.routerRtpCapabilities as mediasoupTypes.RtpCapabilities;
     },
 
-    [MSA.Heartbeat]: args => {
+    [Actions.Heartbeat]: args => {
       this.handleHeartbeat(args);
     },
 
-    [MSA.HeartbeatAck]: args => {
+    [Actions.HeartbeatAck]: args => {
       console.log(`💗 Heartbeat acknowledged by ${this.id}`, args);
     },
 
-    [MSA.ServerShutdown]: args => {
+    [Actions.ServerShutdown]: args => {
       this.handleServerShutdown(args);
     },
 
