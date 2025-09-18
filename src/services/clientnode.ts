@@ -51,7 +51,8 @@ class ClientNode extends EventEmitter {
     this.connection.on(
       'message',
       (data: MessageData, callback: AckCallback) => {
-        const { action, args } = data;
+        const { action, args = {} } = data;
+
         const handler = this.actionHandlers[action as Actions];
         if (handler) handler(args, callback);
       }
@@ -77,6 +78,8 @@ class ClientNode extends EventEmitter {
       try {
         const data = ValidationSchema.roomIdPeerId.parse(args);
         const { roomId, peerId } = data;
+
+        console.log(data);
 
         const lobby = Lobby.getLobby(roomId) || new Lobby({ roomId });
         const visitor = new Visitor({
@@ -274,7 +277,7 @@ class ClientNode extends EventEmitter {
           tag: Tag.Host,
         });
 
-        this.connection.join(`room-${roomId}`);
+        this.connection.join(getRedisKey['room'](roomId));
         this.connection.data.roomId = roomId;
         this.connection.data.peerId = newPeer.id;
         this.connection.data.isRecorder = peerData.isRecorder || false;

@@ -3,6 +3,7 @@ import Peer from './peer';
 import { redisServer } from '../servers/redis-server';
 import { PeerData, RoomData, RoomInstanceData } from '../types';
 import { getPubSubChannel, getRedisKey } from '../lib/utils';
+import { Actions } from '../types/actions';
 
 class Room extends EventEmitter {
   roomId: string;
@@ -100,7 +101,7 @@ class Room extends EventEmitter {
         const roomData: RoomData = {
           id: crypto.randomUUID(),
           title: 'Hello Room',
-          roomId: 'rty-rex-rrt',
+          roomId,
           host: {
             id: crypto.randomUUID(),
             name: 'Favour Grace',
@@ -143,8 +144,23 @@ class Room extends EventEmitter {
     return Room.rooms.get(roomId);
   }
 
-  addPeer(peer: Peer): void {
-    this.peers.set(peer.id, peer);
+  async addPeer(peer: Peer): Promise<void> {
+    try {
+      this.peers.set(peer.id, peer);
+      // close lobby associates
+      const peerData = peer.getData();
+      peer.message({
+        message: {
+          action: Actions.PeerAdded,
+          args: { ...peerData },
+        },
+        broadcast: true,
+      });
+      console.log('Sent message');
+      await this.savePeerInDB(peer);
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   getPeer(peerId: string): Peer | undefined {
@@ -194,6 +210,35 @@ class Room extends EventEmitter {
         ...value,
       })
     );
+  }
+
+  async savePeerInDB(peer: Peer): Promise<void> {
+    const wasSaved = await redisServer.sIsMember(
+      getRedisKey['roomPeerIds'](this.roomId),
+      peer.id
+    );
+    if (wasSaved) {
+      //remove
+      const savedPeers = await this.getPeersFromDB();
+      const foundPeerData = savedPeers.find(value => value.id === peer.id);
+      if (foundPeerData) {
+        await redisServer.sRem(
+          getRedisKey['roomPeers'](this.roomId),
+          JSON.stringify(foundPeerData)
+        );
+      }
+    }
+
+    await redisServer.sAdd(
+      getRedisKey['roomPeers'](this.roomId),
+      JSON.stringify({
+        ...peer.getData(),
+        online: true,
+      })
+    );
+    await redisServer.sAdd(getRedisKey['roomPeerIds'](this.roomId), peer.id);
+
+    console.log('Saved Peer');
   }
 
   async getActiveSpeakerPeerId(): Promise<string | null> {

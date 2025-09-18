@@ -2,6 +2,7 @@ import EventEmitter from 'events';
 import { Socket } from 'socket.io';
 import { MessageData } from '../types';
 import { Actions } from '../types/actions';
+import { getRedisKey } from '../lib/utils';
 
 abstract class Base extends EventEmitter {
   id: string;
@@ -43,7 +44,9 @@ abstract class Base extends EventEmitter {
     includeMe?: boolean;
   }): void {
     if (broadcast) {
-      this.connection.broadcast.to(this.roomId).emit(Actions.Message, message);
+      this.connection.broadcast
+        .to(getRedisKey['room'](this.roomId))
+        .emit(Actions.Message, message);
       if (includeMe) {
         this.connection.emit(Actions.Message, message);
       }
