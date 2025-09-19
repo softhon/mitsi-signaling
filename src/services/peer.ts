@@ -69,6 +69,8 @@ class Peer extends Base {
         this.close();
       }
     }, HEARTBEAT_TIMEOUT);
+
+    this.handleConnection();
   }
 
   getData(): PeerData {
@@ -108,18 +110,21 @@ class Peer extends Base {
     [Actions.CreateWebrtcTransports]: async (args, callback) => {
       try {
         const { roomId, peerId } = this.connection.data;
-
-        const messageRes = await this.medianode.sendMessageForResponse(
+        console.log('CreateWebrtcTransports');
+        const response = await this.medianode.sendMessageForResponse(
           Actions.CreateWebrtcTransports,
           {
             peerId,
             roomId,
           }
         );
-        const transportParams = parseArguments(messageRes.args);
+        console.log('CreateWebrtcTransports', response);
+        //todo return response not message response
         callback({
           status: 'success',
-          response: transportParams,
+          response: response as {
+            [key: string]: unknown;
+          },
         });
       } catch (error) {
         console.log(error);

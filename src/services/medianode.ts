@@ -617,7 +617,7 @@ class MediaNode extends EventEmitter {
         requestId,
       };
 
-      return new Promise<MessageResponse>((resolve, reject) => {
+      return new Promise<{ [key: string]: unknown }>((resolve, reject) => {
         if (this.grpcCall) {
           this.pendingRequests.set(requestId, {
             resolve,
@@ -694,8 +694,9 @@ class MediaNode extends EventEmitter {
             console.log(action, 'pending request Returned error');
             pendingRequest.reject(parsedArgs.error as Error);
           } else {
+            const response = parsedArgs.response as { [key: string]: unknown };
             console.log(action, 'pending request Returned success');
-            pendingRequest.resolve(message);
+            pendingRequest.resolve(response);
           }
           this.pendingRequests.delete(requestId);
           return;
