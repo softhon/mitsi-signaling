@@ -1,5 +1,5 @@
 export type ProducerSource = 'mic' | 'camera' | 'screen' | 'screenAudio';
-
+export type AppData = { [key: string]: unknown };
 export type TransportKind = 'producer' | 'consumer';
 export type AckCallback<T = { [key: string]: unknown }> = (res: {
   status: 'success' | 'error';
@@ -137,6 +137,6 @@ export interface SignalnodeData {
 }
 
 export interface PendingRequest {
-  resolve: (response: { [key: string]: unknown }) => void;
+  resolve: (response: AppData) => void;
   reject: (error: Error) => void;
 }
