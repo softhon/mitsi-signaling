@@ -165,14 +165,11 @@ class Peer extends Base {
     [Actions.CreateConsumersOfAllProducers]: async (args, callback) => {
       try {
         const { roomId, peerId } = this.connection.data;
-
-        await this.medianode.sendMessageForResponse(
-          Actions.CreateConsumersOfAllProducers,
-          {
-            peerId,
-            roomId,
-          }
-        );
+        this.medianode.sendMessage(Actions.CreateConsumersOfAllProducers, {
+          peerId,
+          roomId,
+        });
+        console.log(Actions.CreateConsumersOfAllProducers, 'Two');
 
         callback({
           status: 'success',
