@@ -13,7 +13,7 @@ import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
 import { redisServer } from '../servers/redis-server';
-import { getPubSubChannel, getRedisKey, parseArguments } from '../lib/utils';
+import { getPubSubChannel, getRedisKey } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
 import { Actions } from '../types/actions';
@@ -235,7 +235,9 @@ class ClientNode extends EventEmitter {
 
         const peerExistingHere = room.getPeer(peerData.id);
         if (peerExistingHere) {
+          console.log('Peer is existing here');
           peerExistingHere.close();
+          console.log('close Peer  existing here');
         } else {
           const peerExistingElseWhere = (await room.getPeersOnline()).find(
             peer => peer.id === peerData.id
@@ -254,8 +256,8 @@ class ClientNode extends EventEmitter {
         }
         const medianode = MediaNode.getleastLoadedNode();
         if (!medianode) throw 'No medianode found';
-
-        const messageRes = await medianode.sendMessageForResponse(
+        console.log('deviceRtpCapabilities =>', deviceRtpCapabilities);
+        const response = await medianode.sendMessageForResponse(
           Actions.CreatePeer,
           {
             peerId: peerData.id,
@@ -265,14 +267,12 @@ class ClientNode extends EventEmitter {
           }
         );
 
-        const { routerId } = parseArguments(messageRes.args);
-
         const newPeer = new Peer({
           roomId,
           data: peerData as PeerData,
           connection: this.connection,
           medianode,
-          routerId: routerId as string,
+          routerId: response.routerId as string,
           roles: [Role.Moderator],
           tag: Tag.Host,
         });
@@ -283,16 +283,16 @@ class ClientNode extends EventEmitter {
         this.connection.data.isRecorder = peerData.isRecorder || false;
 
         const peersOnline = await room.getPeersOnline();
-        room.addPeer(newPeer);
+
+        await room.addPeer(newPeer);
 
         const roomData = await room.getData();
-
-        const peers = [newPeer.getData(), ...peersOnline];
 
         callback({
           status: 'success',
           response: {
-            peers,
+            you: newPeer.getData(),
+            peers: peersOnline,
             roomData,
           },
         });
