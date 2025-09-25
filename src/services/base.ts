@@ -1,7 +1,8 @@
 import EventEmitter from 'events';
 import { Socket } from 'socket.io';
-import { MessageData } from '../types';
+import { AckCallback, MessageData } from '../types';
 import { Actions } from '../types/actions';
+import { getRedisKey } from '../lib/utils';
 
 abstract class Base extends EventEmitter {
   id: string;
@@ -27,28 +28,34 @@ abstract class Base extends EventEmitter {
     this.closed = false;
   }
 
-  close(): void {
+  close(silent?: boolean): void {
     if (this.closed) return;
     this.closed = true;
+    this.emit(Actions.Close, { silent });
     this.removeAllListeners();
+    console.log('Peer', 'Close peer');
   }
 
   message({
     message,
     broadcast,
     includeMe,
+    callback,
   }: {
     message: MessageData;
     broadcast?: boolean;
     includeMe?: boolean;
+    callback?: AckCallback;
   }): void {
     if (broadcast) {
-      this.connection.broadcast.to(this.roomId).emit(Actions.Message, message);
+      this.connection.broadcast
+        .to(getRedisKey['room'](this.roomId))
+        .emit(Actions.Message, message);
       if (includeMe) {
         this.connection.emit(Actions.Message, message);
       }
     } else {
-      this.connection.emit(Actions.Message, message);
+      this.connection.emit(Actions.Message, message, callback);
     }
   }
 }

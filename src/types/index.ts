@@ -1,7 +1,5 @@
-import { MessageResponse } from '../protos/gen/mediaSignalingPackage/MessageResponse';
-
 export type ProducerSource = 'mic' | 'camera' | 'screen' | 'screenAudio';
-
+export type ResponseData = { [key: string]: unknown };
 export type TransportKind = 'producer' | 'consumer';
 export type AckCallback<T = { [key: string]: unknown }> = (res: {
   status: 'success' | 'error';
@@ -139,6 +137,6 @@ export interface SignalnodeData {
 }
 
 export interface PendingRequest {
-  resolve: (response: MessageResponse) => void;
+  resolve: (response: ResponseData) => void;
   reject: (error: Error) => void;
 }

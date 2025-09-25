@@ -15,11 +15,23 @@ export enum Actions {
   CloseProducer = 'close_producer',
   PauseProducer = 'pause_producer',
   ResumeProducer = 'resume_producer',
+  CreateConsumer = 'create_consumer',
+  CloseConsumer = 'close_consumer',
   ResumeConsumer = 'resume_consumer',
   PauseConsumer = 'pause_consumer',
+
+  // consumed by client
+  ConsumerCreated = 'consumer_created',
+  ConsumerPaused = 'consumer_paused',
+  ConsumerResumed = 'consumer_resumed',
+  ConsumerClosed = 'consumer_closed',
+
   RestartIce = 'restart_ice',
 
   CreatePeer = 'create_peer',
+  PeerAdded = 'peer_added',
+  PeerLeft = 'peer_left',
+  ClosePeer = 'close_peer',
 
   Mute = 'mute',
   OffCamera = 'off_camera',

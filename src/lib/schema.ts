@@ -36,31 +36,34 @@ const roomIdPeerIdSchema = z.object({
   peerId: z.string(),
 });
 
+const producerSource = z.enum(['mic', 'camera', 'screen']);
+const mediaKind = z.enum(['audio', 'video']);
+
 export const ValidationSchema = {
   peerId: z.object({
     peerId: z.string(),
-  }),
-
-  peerIds: z.object({
-    peerIds: z.array(z.string()),
   }),
 
   roomId: z.object({
     roomId: z.string(),
   }),
 
+  peerIds: z.object({
+    peerIds: z.array(z.string()),
+  }),
+
   roomIdPeerId: roomIdPeerIdSchema,
 
-  roomIdPeerIdPeerData: z.object({
-    roomId: z.string(),
-    peerId: z.string(),
+  roomIdPeerIdPeerData: roomIdPeerIdSchema.extend({
     peerData: peerDataSchema,
   }),
 
   joinMeeting: z.object({
     roomId: z.string(),
     peerData: peerDataSchema,
-    deviceRtpCapabilities: z.any(),
+    deviceRtpCapabilities: z
+      .any()
+      .refine(value => value, 'Can not be null or undefined'),
   }),
 
   connectWebRtcTransport: z.object({
@@ -68,10 +71,25 @@ export const ValidationSchema = {
     dtlsParameters: z.any(),
   }),
 
+  createConsumerData: roomIdPeerIdSchema.extend({
+    id: z.string(),
+    producerId: z.string(),
+    transportId: z.string(),
+    producerPeerId: z.string(),
+    producerSource: producerSource,
+    kind: mediaKind,
+    type: z.string(), //mediasoup consumer type 'simple' | 'simulcast' | 'svc' | 'pipe';
+    rtpParameters: z.any(),
+    appData: z.any(),
+    producerPaused: z.boolean(),
+  }),
+
   createProducer: z.object({
     transportId: z.string(),
     kind: z.enum(['audio', 'video']),
-    rtpParameters: z.any(),
+    rtpParameters: z
+      .any()
+      .refine(value => value, 'Can not be null or undefined'),
     appData: z.any(),
   }),
 

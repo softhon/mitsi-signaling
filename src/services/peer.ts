@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { Actions } from '../types/actions';
 import MediaNode from './medianode';
-import { getPubSubChannel, parseArguments } from '../lib/utils';
+import { getPubSubChannel } from '../lib/utils';
 import { ValidationSchema } from '../lib/schema';
 import { redisServer } from '../servers/redis-server';
 import Room from './room';
@@ -69,6 +69,23 @@ class Peer extends Base {
         this.close();
       }
     }, HEARTBEAT_TIMEOUT);
+
+    this.handleConnection();
+  }
+
+  close(silent?: boolean): void {
+    if (this.closed) return;
+    this.closed = true;
+    clearInterval(this.heartBeatInterval);
+
+    this.emit(Actions.Close, { silent });
+    this.removeAllListeners();
+    console.log('Peer', 'Close peer');
+    if (!silent) this.connection.disconnect(true);
+  }
+
+  getMedianode(): MediaNode {
+    return this.medianode;
   }
 
   getData(): PeerData {
@@ -108,18 +125,21 @@ class Peer extends Base {
     [Actions.CreateWebrtcTransports]: async (args, callback) => {
       try {
         const { roomId, peerId } = this.connection.data;
-
-        const messageRes = await this.medianode.sendMessageForResponse(
+        console.log('CreateWebrtcTransports');
+        const response = await this.medianode.sendMessageForResponse(
           Actions.CreateWebrtcTransports,
           {
             peerId,
             roomId,
           }
         );
-        const transportParams = parseArguments(messageRes.args);
+        console.log('CreateWebrtcTransports', response);
+        //todo return response not message response
         callback({
           status: 'success',
-          response: transportParams,
+          response: response as {
+            [key: string]: unknown;
+          },
         });
       } catch (error) {
         console.log(error);
@@ -135,15 +155,14 @@ class Peer extends Base {
         const data = ValidationSchema.connectWebRtcTransport.parse(args);
         const { dtlsParameters, transportId } = data;
 
-        await this.medianode.sendMessageForResponse(
-          Actions.ConnectWebrtcTransports,
-          {
-            peerId,
-            roomId,
-            dtlsParameters,
-            transportId,
-          }
-        );
+        console.log('ConnectWebrtcTransports', roomId, peerId);
+
+        this.medianode.sendMessage(Actions.ConnectWebrtcTransports, {
+          peerId,
+          roomId,
+          dtlsParameters,
+          transportId,
+        });
 
         callback({
           status: 'success',
@@ -160,14 +179,11 @@ class Peer extends Base {
     [Actions.CreateConsumersOfAllProducers]: async (args, callback) => {
       try {
         const { roomId, peerId } = this.connection.data;
-
-        await this.medianode.sendMessageForResponse(
-          Actions.CreateConsumersOfAllProducers,
-          {
-            peerId,
-            roomId,
-          }
-        );
+        this.medianode.sendMessage(Actions.CreateConsumersOfAllProducers, {
+          peerId,
+          roomId,
+        });
+        console.log(Actions.CreateConsumersOfAllProducers, 'Two');
 
         callback({
           status: 'success',
@@ -186,8 +202,9 @@ class Peer extends Base {
         const { roomId, peerId } = this.connection.data;
         const data = ValidationSchema.createProducer.parse(args);
         const { transportId, kind, rtpParameters, appData } = data;
+        console.log('createProducer', roomId, peerId);
 
-        const messageRes = await this.medianode.sendMessageForResponse(
+        const response = await this.medianode.sendMessageForResponse(
           Actions.CreateProducer,
           {
             peerId,
@@ -198,13 +215,12 @@ class Peer extends Base {
             appData: { peerName: this.data.name, ...appData },
           }
         );
-        if (!messageRes) throw 'sendMessageForResponse returned null';
 
-        const { producerId } = parseArguments(messageRes.args);
+        console.log('createProducer', response);
 
         callback({
           status: 'success',
-          response: { producerId },
+          response,
         });
       } catch (error) {
         console.log(error);

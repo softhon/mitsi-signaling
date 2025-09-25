@@ -6,13 +6,15 @@ import * as protoLoader from '@grpc/proto-loader';
 
 import { redisServer } from '../servers/redis-server';
 import { getRedisKey, parseArguments as parseArguments } from '../lib/utils';
-import { MediaNodeData, PendingRequest } from '../types';
+import { MediaNodeData, PendingRequest, ResponseData } from '../types';
 import { ProtoGrpcType } from '../protos/gen/media-signaling';
 import { MediaSignalingClient } from '../protos/gen/mediaSignalingPackage/MediaSignaling';
 import { MessageRequest } from '../protos/gen/mediaSignalingPackage/MessageRequest';
 import { MessageResponse } from '../protos/gen/mediaSignalingPackage/MessageResponse';
 import config from '../config';
 import { Actions } from '../types/actions';
+import { ValidationSchema } from '../lib/schema';
+import Room from './room';
 
 const PROTO_FILE = path.resolve(__dirname, '../protos/media-signaling.proto');
 const packageDefinition = protoLoader.loadSync(PROTO_FILE, {
@@ -385,7 +387,7 @@ class MediaNode extends EventEmitter {
 
     if (this.reconnectAttempts >= this.reconnectConfig.maxRetries) {
       console.error(
-        `🚫 Max reconnection attempts (${this.reconnectConfig.maxRetries}) reached for node ${this.id}`
+        `Max reconnection attempts (${this.reconnectConfig.maxRetries}) reached for node ${this.id}`
       );
       this.setState(ConnectionState.FAILED);
       this.emit('connectionFailed', {
@@ -398,7 +400,7 @@ class MediaNode extends EventEmitter {
 
     const delay = this.calculateReconnectDelay();
     console.log(
-      `⏰ Scheduling reconnection attempt ${this.reconnectAttempts + 1}/${this.reconnectConfig.maxRetries} for node ${this.id} in ${Math.round(delay)}ms`
+      `Scheduling reconnection attempt ${this.reconnectAttempts + 1}/${this.reconnectConfig.maxRetries} for node ${this.id} in ${Math.round(delay)}ms`
     );
 
     this.setState(ConnectionState.RECONNECTING);
@@ -421,19 +423,19 @@ class MediaNode extends EventEmitter {
   async connect(): Promise<void> {
     if (this.isShuttingDown) {
       console.log(
-        `🛑 Node ${this.id} is shutting down, skipping connection attempt`
+        `Node ${this.id} is shutting down, skipping connection attempt`
       );
       return;
     }
 
     if (this.connectionState === ConnectionState.CONNECTING) {
-      console.log(`⏳ Connection already in progress for node ${this.id}`);
+      console.log(`Connection already in progress for node ${this.id}`);
       return;
     }
 
     if (!this.shouldAttemptConnection()) {
       console.log(
-        `🔴 Circuit breaker prevents connection attempt for node ${this.id}`
+        `Circuit breaker prevents connection attempt for node ${this.id}`
       );
       return;
     }
@@ -443,7 +445,7 @@ class MediaNode extends EventEmitter {
 
     try {
       console.log(
-        `🔌 Connecting to MediaNode ${this.id} at ${this.ip}:${this.grpcPort} (attempt ${this.reconnectAttempts + 1})`
+        `Connecting to MediaNode ${this.id} at ${this.ip}:${this.grpcPort} (attempt ${this.reconnectAttempts + 1})`
       );
 
       // Set connection timeout
@@ -492,10 +494,10 @@ class MediaNode extends EventEmitter {
       console.log('sendMessageForResponse - 2', pingResponse);
 
       console.log(
-        `✅ Successfully connected to MediaNode ${this.id} at ${this.ip}:${this.grpcPort}`
+        `Successfully connected to MediaNode ${this.id} at ${this.ip}:${this.grpcPort}`
       );
     } catch (error) {
-      console.error(`❌ Failed to connect to MediaNode ${this.id}:`, error);
+      console.error(`Failed to connect to MediaNode ${this.id}:`, error);
       this.handleConnectionError(error as Error, 'connection_failed');
     }
   }
@@ -550,7 +552,7 @@ class MediaNode extends EventEmitter {
         if (error) {
           reject(new Error(`gRPC client not ready: ${error.message}`));
         } else {
-          console.log(`🎯 gRPC client ready for node ${this.id}`);
+          console.log(`gRPC client ready for node ${this.id}`);
           resolve();
         }
       });
@@ -577,7 +579,7 @@ class MediaNode extends EventEmitter {
   sendMessage(action: Actions, args?: { [key: string]: unknown }): boolean {
     if (!this.grpcCall) {
       console.warn(
-        `⚠️  Cannot send message to MediaNode ${this.id}: not connected`
+        `Cannot send message to MediaNode ${this.id}: not connected`
       );
       return false;
     }
@@ -590,11 +592,11 @@ class MediaNode extends EventEmitter {
 
       this.grpcCall.write(message);
 
-      console.log(`📤 Sent ${action} to MediaNode ${this.id}`);
+      console.log(`Sent ${action} to MediaNode ${this.id}`);
 
       return true;
     } catch (error) {
-      console.error(`❌ Error sending message to MediaNode ${this.id}:`, error);
+      console.error(`Error sending message to MediaNode ${this.id}:`, error);
       this.handleConnectionError(error as Error, 'send_message_error');
       return false;
     }
@@ -603,10 +605,10 @@ class MediaNode extends EventEmitter {
   async sendMessageForResponse(
     action: Actions,
     args?: { [key: string]: unknown }
-  ): Promise<MessageResponse> {
+  ): Promise<ResponseData> {
     try {
       if (!this.grpcCall) {
-        throw `⚠️  Cannot send message to MediaNode ${this.id}: not connected`;
+        throw `Cannot send message to MediaNode ${this.id}: not connected`;
       }
 
       const requestId = crypto.randomUUID();
@@ -617,7 +619,7 @@ class MediaNode extends EventEmitter {
         requestId,
       };
 
-      return new Promise<MessageResponse>((resolve, reject) => {
+      return new Promise<ResponseData>((resolve, reject) => {
         if (this.grpcCall) {
           this.pendingRequests.set(requestId, {
             resolve,
@@ -646,7 +648,7 @@ class MediaNode extends EventEmitter {
 
     // Handle connection events
     this.grpcCall.on('end', () => {
-      console.log(`📤 MediaNode ${this.id} ended the connection`);
+      console.log(`MediaNode ${this.id} ended the connection`);
       this.handleConnectionError(
         new Error('Connection ended by remote'),
         'remote_end'
@@ -654,12 +656,12 @@ class MediaNode extends EventEmitter {
     });
 
     this.grpcCall.on('error', (error: Error) => {
-      console.error(`💥 Stream error for MediaNode ${this.id}:`, error);
+      console.error(`Stream error for MediaNode ${this.id}:`, error);
       this.handleConnectionError(error, 'stream_error');
     });
 
     this.grpcCall.on('close', () => {
-      console.log(`🔌 Stream closed for MediaNode ${this.id}`);
+      console.log(`Stream closed for MediaNode ${this.id}`);
       if (this.connectionState === ConnectionState.CONNECTED) {
         this.handleConnectionError(
           new Error('Stream closed unexpectedly'),
@@ -669,7 +671,7 @@ class MediaNode extends EventEmitter {
     });
 
     this.grpcCall.on('cancelled', () => {
-      console.log(`🚫 Stream cancelled for MediaNode ${this.id}`);
+      console.log(`Stream cancelled for MediaNode ${this.id}`);
       this.handleConnectionError(
         new Error('Stream cancelled'),
         'stream_cancelled'
@@ -694,8 +696,9 @@ class MediaNode extends EventEmitter {
             console.log(action, 'pending request Returned error');
             pendingRequest.reject(parsedArgs.error as Error);
           } else {
+            const response = parsedArgs.response as { [key: string]: unknown };
             console.log(action, 'pending request Returned success');
-            pendingRequest.resolve(message);
+            pendingRequest.resolve(response);
           }
           this.pendingRequests.delete(requestId);
           return;
@@ -722,12 +725,12 @@ class MediaNode extends EventEmitter {
           handler(parsedArgs, requestId);
         } catch (handlerError) {
           console.error(
-            `❌ Error in handler for action ${action} from ${this.id}:`,
+            `Error in handler for action ${action} from ${this.id}:`,
             handlerError
           );
         }
       } else {
-        console.warn(`⚠️  No handler for action ${action} from ${this.id}`);
+        console.warn(`No handler for action ${action} from ${this.id}`);
         this.emit('unhandledMessage', {
           nodeId: this.id,
           action,
@@ -742,7 +745,7 @@ class MediaNode extends EventEmitter {
         timestamp: new Date(),
       });
     } catch (error) {
-      console.error(`💥 Error handling message from ${this.id}:`, error);
+      console.error(`Error handling message from ${this.id}:`, error);
     }
   }
 
@@ -756,7 +759,7 @@ class MediaNode extends EventEmitter {
   }
 
   private handleServerShutdown(args: { [key: string]: unknown }): void {
-    console.log(`📢 Server shutdown notification from ${this.id}:`, args);
+    console.log(`Server shutdown notification from ${this.id}:`, args);
     this.emit('serverShutdown', { nodeId: this.id, args });
 
     // Don't attempt to reconnect immediately after server shutdown
@@ -782,7 +785,7 @@ class MediaNode extends EventEmitter {
         await new Promise(resolve => setTimeout(resolve, 1000));
       } catch (error) {
         console.warn(
-          `⚠️  Error sending disconnect message for node ${this.id}:`,
+          `Error sending disconnect message for node ${this.id}:`,
           error
         );
       }
@@ -799,11 +802,63 @@ class MediaNode extends EventEmitter {
   }
 
   forceDisconnect(reason: string = 'force_disconnect'): void {
-    console.log(`💥 Force disconnecting MediaNode ${this.id} (${reason})`);
+    console.log(`Force disconnecting MediaNode ${this.id} (${reason})`);
     this.isShuttingDown = true;
     this.cleanup();
     this.setState(ConnectionState.DISCONNECTED);
     MediaNode.mediaNodes.delete(this.id);
+  }
+
+  sendResponse(
+    action: Actions,
+    requestId: string,
+    response: { [key: string]: unknown }
+  ): void {
+    if (!this.grpcCall) {
+      console.warn(
+        `⚠️Cannot send message to MediaNode ${this.id}: not connected`
+      );
+      return;
+    }
+
+    try {
+      const message: MessageRequest = {
+        action,
+        requestId,
+        args: JSON.stringify({
+          status: 'success',
+          response,
+        }),
+      };
+
+      this.grpcCall.write(message);
+    } catch (error) {
+      console.error(`Error sending message to MediaNode ${this.id}:`, error);
+      throw error;
+    }
+  }
+  sendError(action: Actions, requestId: string, error: Error | unknown): void {
+    if (!this.grpcCall) {
+      console.warn(
+        `⚠️Cannot send message to MediaNode ${this.id}: not connected`
+      );
+      return;
+    }
+    try {
+      const message: MessageRequest = {
+        action,
+        requestId,
+        args: JSON.stringify({
+          status: 'error',
+          error,
+        }),
+      };
+
+      this.grpcCall.write(message);
+    } catch (error) {
+      console.error(`Error sending message to MediaNode ${this.id}:`, error);
+      throw error;
+    }
   }
 
   // Static methods for managing all nodes
@@ -829,7 +884,7 @@ class MediaNode extends EventEmitter {
 
   static async disconnectAll(): Promise<void> {
     console.log(
-      `🛑 Disconnecting all ${MediaNode.mediaNodes.size} media nodes...`
+      ` Disconnecting all ${MediaNode.mediaNodes.size} media nodes...`
     );
 
     const nodes = Array.from(MediaNode.mediaNodes.values());
@@ -842,7 +897,7 @@ class MediaNode extends EventEmitter {
 
     await Promise.allSettled(disconnectPromises);
     MediaNode.mediaNodes.clear();
-    console.log('✅ All media nodes disconnected');
+    console.log('All media nodes disconnected');
   }
 
   static getConnectionStats(): { [key: string]: number } {
@@ -861,7 +916,7 @@ class MediaNode extends EventEmitter {
   static broadcastMessage(): void {}
 
   static async reconnectAll(): Promise<void> {
-    console.log('🔄 Reconnecting all disconnected media nodes...');
+    console.log('Reconnecting all disconnected media nodes...');
 
     const disconnectedNodes = MediaNode.getNodesByState(
       ConnectionState.DISCONNECTED
@@ -869,13 +924,13 @@ class MediaNode extends EventEmitter {
 
     const reconnectPromises = disconnectedNodes.map(node =>
       node.connect().catch(error => {
-        console.warn(`⚠️  Error reconnecting node ${node.id}:`, error);
+        console.warn(`Error reconnecting node ${node.id}:`, error);
       })
     );
 
     await Promise.allSettled(reconnectPromises);
     console.log(
-      `✅ Reconnection attempts completed for ${disconnectedNodes.length} nodes`
+      `Reconnection attempts completed for ${disconnectedNodes.length} nodes`
     );
   }
 
@@ -887,7 +942,7 @@ class MediaNode extends EventEmitter {
     ) => void;
   } = {
     [Actions.Connected]: args => {
-      // console.log(`✅ Connection confirmed from node ${this.id}:`, args);
+      // console.log(`Connection confirmed from node ${this.id}:`, args);
       this.emit('connectionConfirmed', { nodeId: this.id, args });
       this.routerRtpCapabilities =
         args.routerRtpCapabilities as mediasoupTypes.RtpCapabilities;
@@ -898,11 +953,46 @@ class MediaNode extends EventEmitter {
     },
 
     [Actions.HeartbeatAck]: args => {
-      console.log(`💗 Heartbeat acknowledged by ${this.id}`, args);
+      console.log(`Heartbeat acknowledged by ${this.id}`, args);
     },
 
     [Actions.ServerShutdown]: args => {
       this.handleServerShutdown(args);
+    },
+
+    [Actions.ConsumerCreated]: (args, requestId) => {
+      console.log(args, 'consumer');
+      const { peerId, roomId } =
+        ValidationSchema.createConsumerData.parse(args);
+      const room = Room.getRoom(roomId);
+      const peer = room?.getPeer(peerId);
+      if (!peer) throw `No room or peer found`;
+
+      peer.message({
+        message: {
+          action: Actions.ConsumerCreated,
+          args,
+        },
+        callback: res => {
+          if (res.status === 'error') {
+            console.log(res.error);
+            peer
+              .getMedianode()
+              .sendError(
+                Actions.ConsumerCreated,
+                requestId as string,
+                new Error(res.error as string)
+              );
+          } else {
+            console.log(
+              'Callback for createConsumer called by cleint successfully'
+            );
+            peer
+              .getMedianode()
+              .sendResponse(Actions.ConsumerCreated, requestId as string, {});
+          }
+        },
+      });
     },
 
     // Add more handlers as needed for your specific actions

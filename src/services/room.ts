@@ -3,6 +3,8 @@ import Peer from './peer';
 import { redisServer } from '../servers/redis-server';
 import { PeerData, RoomData, RoomInstanceData } from '../types';
 import { getPubSubChannel, getRedisKey } from '../lib/utils';
+import { Actions } from '../types/actions';
+import { ROOM_TIMEOUT } from '../lib/contants';
 
 class Room extends EventEmitter {
   roomId: string;
@@ -64,6 +66,8 @@ class Room extends EventEmitter {
     this.recorder = null;
     this.closed = false;
 
+    this.handleEvents();
+    this.handleCountDown();
     Room.rooms.set(roomId, this);
   }
 
@@ -100,7 +104,7 @@ class Room extends EventEmitter {
         const roomData: RoomData = {
           id: crypto.randomUUID(),
           title: 'Hello Room',
-          roomId: 'rty-rex-rrt',
+          roomId,
           host: {
             id: crypto.randomUUID(),
             name: 'Favour Grace',
@@ -143,8 +147,25 @@ class Room extends EventEmitter {
     return Room.rooms.get(roomId);
   }
 
-  addPeer(peer: Peer): void {
-    this.peers.set(peer.id, peer);
+  async addPeer(peer: Peer): Promise<void> {
+    try {
+      this.peers.set(peer.id, peer);
+      // close lobby associates
+      if (this.selfDestructTimeout) clearTimeout(this.selfDestructTimeout);
+      this.handlePeerEvents(peer);
+      const peerData = peer.getData();
+      peer.message({
+        message: {
+          action: Actions.PeerAdded,
+          args: { ...peerData },
+        },
+        broadcast: true,
+      });
+      console.log('Sent message');
+      await this.savePeer(peer);
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   getPeer(peerId: string): Peer | undefined {
@@ -156,7 +177,13 @@ class Room extends EventEmitter {
   }
 
   removePeer(peerId: string): void {
+    const peer = this.peers.get(peerId);
+    if (!peer) return;
     this.peers.delete(peerId);
+    this.updatePeerInDB(peer, { online: false }).catch(error =>
+      console.log(error)
+    );
+    if (this.isEmpty()) this.selfDestructCountDown();
   }
 
   async getPeersFromDB(): Promise<PeerData[]> {
@@ -196,11 +223,44 @@ class Room extends EventEmitter {
     );
   }
 
+  async savePeer(peer: Peer): Promise<void> {
+    const wasSaved = await redisServer.sIsMember(
+      getRedisKey['roomPeerIds'](this.roomId),
+      peer.id
+    );
+    if (wasSaved) {
+      //remove
+      const savedPeers = await this.getPeersFromDB();
+      const foundPeerData = savedPeers.find(value => value.id === peer.id);
+      if (foundPeerData) {
+        await redisServer.sRem(
+          getRedisKey['roomPeers'](this.roomId),
+          JSON.stringify(foundPeerData)
+        );
+      }
+    }
+
+    await redisServer.sAdd(
+      getRedisKey['roomPeers'](this.roomId),
+      JSON.stringify({
+        ...peer.getData(),
+        online: true,
+      })
+    );
+    await redisServer.sAdd(getRedisKey['roomPeerIds'](this.roomId), peer.id);
+
+    console.log('Saved Peer');
+  }
+
   async getActiveSpeakerPeerId(): Promise<string | null> {
     const data = await redisServer.get(
       getRedisKey['roomActiveSpeakerPeerId'](this.roomId)
     );
     return data;
+  }
+
+  isEmpty(): boolean {
+    return Array.from(this.peers.keys()).length === 0;
   }
 
   async getData(): Promise<RoomInstanceData | undefined> {
@@ -213,6 +273,52 @@ class Room extends EventEmitter {
       timeLeft: this.timeLeft,
     };
   }
+
+  private handleCountDown(): void {
+    if (this.endCountDownInterval) clearInterval(this.endCountDownInterval);
+    this.endCountDownInterval = setInterval(() => {
+      this.timeLeft -= 1;
+      // console.log("timeLeft", this.timeLeft)
+      if (this.timeLeft < 1) {
+        this.close(true);
+      }
+    }, 60000); // 1minute interval
+  }
+
+  private async selfDestructCountDown(): Promise<void> {
+    try {
+      if (this.closed || !this.isEmpty()) return;
+      if (this.selfDestructTimeout) clearTimeout(this.selfDestructTimeout);
+
+      this.selfDestructTimeout = setTimeout(async () => {
+        const peersOnline = await this.getPeersOnline();
+        this.close(peersOnline.length === 0);
+      }, ROOM_TIMEOUT);
+    } catch (error) {
+      console.error('selfDestructCountDown Failed', error);
+    }
+  }
+
+  private handlePeerEvents(peer: Peer): void {
+    peer.on(Actions.Close, ({ silent }) => {
+      console.log('Close Peer:', { silent });
+      this.removePeer(peer.id);
+      if (!silent)
+        peer.message({
+          message: {
+            action: Actions.PeerLeft,
+            args: {
+              id: peer.id,
+              name: peer.getData().name,
+            },
+          },
+          broadcast: true,
+        });
+    });
+    console.log('Register peer events');
+  }
+
+  private handleEvents(): void {}
 }
 
 export default Room;
