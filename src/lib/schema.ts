@@ -84,6 +84,13 @@ export const ValidationSchema = {
     producerPaused: z.boolean(),
   }),
 
+  ConsumerStateData: roomIdPeerIdSchema.extend({
+    consumerId: z.string(),
+    producerPeerId: z.string(),
+    producerSource: producerSource,
+    fromProducer: z.boolean(),
+  }),
+
   createProducer: z.object({
     transportId: z.string(),
     kind: z.enum(['audio', 'video']),

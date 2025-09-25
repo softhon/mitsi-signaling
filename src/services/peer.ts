@@ -377,7 +377,7 @@ class Peer extends Base {
           peerIds.forEach(id => {
             const peer = peers.find(peer => id === peer.id);
             if (peer)
-              peer.message({
+              peer.sendMessage({
                 message: {
                   action: Actions.Mute,
                   args: {},
@@ -419,7 +419,7 @@ class Peer extends Base {
           peerIds.forEach(id => {
             const peer = peers.find(peer => id === peer.id);
             if (peer)
-              peer.message({
+              peer.sendMessage({
                 message: {
                   action: Actions.OffCamera,
                   args: {},
@@ -461,7 +461,7 @@ class Peer extends Base {
           peerIds.forEach(id => {
             const peer = peers.find(peer => id === peer.id);
             if (peer)
-              peer.message({
+              peer.sendMessage({
                 message: {
                   action: Actions.StopScreen,
                   args: {},

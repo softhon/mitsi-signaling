@@ -36,7 +36,7 @@ abstract class Base extends EventEmitter {
     console.log('Peer', 'Close peer');
   }
 
-  message({
+  sendMessage({
     message,
     broadcast,
     includeMe,

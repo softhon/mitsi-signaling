@@ -968,7 +968,7 @@ class MediaNode extends EventEmitter {
       const peer = room?.getPeer(peerId);
       if (!peer) throw `No room or peer found`;
 
-      peer.message({
+      peer.sendMessage({
         message: {
           action: Actions.ConsumerCreated,
           args,
@@ -993,6 +993,51 @@ class MediaNode extends EventEmitter {
           }
         },
       });
+    },
+
+    [Actions.ConsumerPaused]: args => {
+      console.log(args, 'consumer');
+      const { peerId, roomId } = ValidationSchema.ConsumerStateData.parse(args);
+      const room = Room.getRoom(roomId);
+      const peer = room?.getPeer(peerId);
+      if (!peer) throw `No room or peer found`;
+      peer.sendMessage({
+        message: {
+          action: Actions.ConsumerPaused,
+          args,
+        },
+      });
+      console.log(Actions.ConsumerPaused);
+    },
+
+    [Actions.ConsumerResumed]: args => {
+      console.log(args, 'consumer');
+      const { peerId, roomId } = ValidationSchema.ConsumerStateData.parse(args);
+      const room = Room.getRoom(roomId);
+      const peer = room?.getPeer(peerId);
+      if (!peer) throw `No room or peer found`;
+      peer.sendMessage({
+        message: {
+          action: Actions.ConsumerResumed,
+          args,
+        },
+      });
+      console.log(Actions.ConsumerResumed);
+    },
+
+    [Actions.ConsumerClosed]: args => {
+      console.log(args, 'consumer');
+      const { peerId, roomId } = ValidationSchema.ConsumerStateData.parse(args);
+      const room = Room.getRoom(roomId);
+      const peer = room?.getPeer(peerId);
+      if (!peer) throw `No room or peer found`;
+      peer.sendMessage({
+        message: {
+          action: Actions.ConsumerClosed,
+          args,
+        },
+      });
+      console.log(Actions.ConsumerClosed);
     },
 
     // Add more handlers as needed for your specific actions

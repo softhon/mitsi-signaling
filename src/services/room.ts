@@ -154,7 +154,7 @@ class Room extends EventEmitter {
       if (this.selfDestructTimeout) clearTimeout(this.selfDestructTimeout);
       this.handlePeerEvents(peer);
       const peerData = peer.getData();
-      peer.message({
+      peer.sendMessage({
         message: {
           action: Actions.PeerAdded,
           args: { ...peerData },
@@ -304,7 +304,7 @@ class Room extends EventEmitter {
       console.log('Close Peer:', { silent });
       this.removePeer(peer.id);
       if (!silent)
-        peer.message({
+        peer.sendMessage({
           message: {
             action: Actions.PeerLeft,
             args: {
