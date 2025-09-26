@@ -111,7 +111,14 @@ class Peer extends Base {
       (data: MessageData, callback: AckCallback) => {
         const { action, args } = data;
         const handler = this.actionHandlers[action as Actions];
-        if (handler) handler(args, callback);
+        if (handler)
+          handler(args, callback).catch(error => {
+            console.error(`Error from ${action}`, error);
+            callback({
+              status: 'error',
+              error,
+            });
+          });
       }
     );
   }
@@ -120,470 +127,323 @@ class Peer extends Base {
     [key in Actions]?: (
       args: { [key: string]: unknown },
       callback: AckCallback
-    ) => void;
+    ) => Promise<void>;
   } = {
     [Actions.CreateWebrtcTransports]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        console.log('CreateWebrtcTransports');
-        const response = await this.medianode.sendMessageForResponse(
-          Actions.CreateWebrtcTransports,
-          {
-            peerId,
-            roomId,
-          }
-        );
-        console.log('CreateWebrtcTransports', response);
-        //todo return response not message response
-        callback({
-          status: 'success',
-          response: response as {
-            [key: string]: unknown;
-          },
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      const { roomId, peerId } = this.connection.data;
+      console.log('CreateWebrtcTransports');
+      const response = await this.medianode.sendMessageForResponse(
+        Actions.CreateWebrtcTransports,
+        {
+          peerId,
+          roomId,
+        }
+      );
+      console.log('CreateWebrtcTransports', response);
+      //todo return response not message response
+      callback({
+        status: 'success',
+        response: response as {
+          [key: string]: unknown;
+        },
+      });
     },
     [Actions.ConnectWebrtcTransports]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        const data = ValidationSchema.connectWebRtcTransport.parse(args);
-        const { dtlsParameters, transportId } = data;
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.connectWebRtcTransport.parse(args);
+      const { dtlsParameters, transportId } = data;
 
-        console.log('ConnectWebrtcTransports', roomId, peerId);
+      console.log('ConnectWebrtcTransports', roomId, peerId);
 
-        this.medianode.sendMessage(Actions.ConnectWebrtcTransports, {
-          peerId,
-          roomId,
-          dtlsParameters,
-          transportId,
-        });
+      this.medianode.sendMessage(Actions.ConnectWebrtcTransports, {
+        peerId,
+        roomId,
+        dtlsParameters,
+        transportId,
+      });
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
     [Actions.CreateConsumersOfAllProducers]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        this.medianode.sendMessage(Actions.CreateConsumersOfAllProducers, {
-          peerId,
-          roomId,
-        });
-        console.log(Actions.CreateConsumersOfAllProducers, 'Two');
+      const { roomId, peerId } = this.connection.data;
+      this.medianode.sendMessage(Actions.CreateConsumersOfAllProducers, {
+        peerId,
+        roomId,
+      });
+      console.log(Actions.CreateConsumersOfAllProducers, 'Two');
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.CreateProducer]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        const data = ValidationSchema.createProducer.parse(args);
-        const { transportId, kind, rtpParameters, appData } = data;
-        console.log('createProducer', roomId, peerId);
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.createProducer.parse(args);
+      const { transportId, kind, rtpParameters, appData } = data;
+      console.log('createProducer', roomId, peerId);
 
-        const response = await this.medianode.sendMessageForResponse(
-          Actions.CreateProducer,
-          {
-            peerId,
-            roomId,
-            rtpParameters,
-            transportId,
-            kind,
-            appData: { peerName: this.data.name, ...appData },
-          }
-        );
+      const response = await this.medianode.sendMessageForResponse(
+        Actions.CreateProducer,
+        {
+          peerId,
+          roomId,
+          rtpParameters,
+          transportId,
+          kind,
+          appData: { peerName: this.data.name, ...appData },
+        }
+      );
 
-        console.log('createProducer', response);
+      console.log('createProducer', response);
 
-        callback({
-          status: 'success',
-          response,
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+        response,
+      });
     },
 
     [Actions.CloseProducer]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        const data = ValidationSchema.producer.parse(args);
-        const { producerId, source } = data;
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.producer.parse(args);
+      const { producerId, source } = data;
 
-        this.medianode.sendMessage(Actions.CloseProducer, {
-          peerId,
-          roomId,
-          producerId,
-          source,
-        });
+      this.medianode.sendMessage(Actions.CloseProducer, {
+        peerId,
+        roomId,
+        producerId,
+        source,
+      });
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.PauseProducer]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        const data = ValidationSchema.producer.parse(args);
-        const { producerId, source } = data;
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.producer.parse(args);
+      const { producerId, source } = data;
 
-        this.medianode.sendMessage(Actions.PauseProducer, {
-          peerId,
-          roomId,
-          producerId,
-          source,
-        });
+      this.medianode.sendMessage(Actions.PauseProducer, {
+        peerId,
+        roomId,
+        producerId,
+        source,
+      });
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.ResumeProducer]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        const data = ValidationSchema.producer.parse(args);
-        const { producerId, source } = data;
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.producer.parse(args);
+      const { producerId, source } = data;
 
-        this.medianode.sendMessage(Actions.ResumeProducer, {
-          peerId,
-          roomId,
-          producerId,
-          source,
-        });
+      this.medianode.sendMessage(Actions.ResumeProducer, {
+        peerId,
+        roomId,
+        producerId,
+        source,
+      });
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.ResumeConsumer]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        const data = ValidationSchema.consumer.parse(args);
-        const { consumerId, source } = data;
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.consumer.parse(args);
+      const { consumerId, source } = data;
 
-        this.medianode.sendMessage(Actions.ResumeConsumer, {
-          peerId,
-          roomId,
-          consumerId,
-          source,
-        });
+      this.medianode.sendMessage(Actions.ResumeConsumer, {
+        peerId,
+        roomId,
+        consumerId,
+        source,
+      });
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.PauseConsumer]: async (args, callback) => {
-      try {
-        const { roomId, peerId } = this.connection.data;
-        const data = ValidationSchema.consumer.parse(args);
-        const { consumerId, source } = data;
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.consumer.parse(args);
+      const { consumerId, source } = data;
 
-        this.medianode.sendMessage(Actions.PauseConsumer, {
-          peerId,
-          roomId,
-          consumerId,
-          source,
-        });
+      this.medianode.sendMessage(Actions.PauseConsumer, {
+        peerId,
+        roomId,
+        consumerId,
+        source,
+      });
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.Mute]: async (args, callback) => {
-      try {
-        const { roomId } = this.connection.data;
-        const data = ValidationSchema.peerIds.parse(args);
-        const { peerIds } = data;
+      const { roomId } = this.connection.data;
+      const data = ValidationSchema.peerIds.parse(args);
+      const { peerIds } = data;
 
-        redisServer.publish({
-          channel: getPubSubChannel['room'](roomId),
-          action: Actions.Mute,
-          args: {
-            peerIds,
-          },
-        });
+      redisServer.publish({
+        channel: getPubSubChannel['room'](roomId),
+        action: Actions.Mute,
+        args: {
+          peerIds,
+        },
+      });
 
-        const room = Room.getRoom(roomId);
+      const room = Room.getRoom(roomId);
 
-        if (room) {
-          const peers = room.getPeers();
-          peerIds.forEach(id => {
-            const peer = peers.find(peer => id === peer.id);
-            if (peer)
-              peer.sendMessage({
-                message: {
-                  action: Actions.Mute,
-                  args: {},
-                },
-              });
-          });
-        }
-
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
+      if (room) {
+        const peers = room.getPeers();
+        peerIds.forEach(id => {
+          const peer = peers.find(peer => id === peer.id);
+          if (peer)
+            peer.sendMessage({
+              message: {
+                action: Actions.Mute,
+                args: {},
+              },
+            });
         });
       }
+
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.OffCamera]: async (args, callback) => {
-      try {
-        const { roomId } = this.connection.data;
-        const data = ValidationSchema.peerIds.parse(args);
-        const { peerIds } = data;
+      const { roomId } = this.connection.data;
+      const data = ValidationSchema.peerIds.parse(args);
+      const { peerIds } = data;
 
-        redisServer.publish({
-          channel: getPubSubChannel['room'](roomId),
-          action: Actions.OffCamera,
-          args: {
-            peerIds,
-          },
-        });
+      redisServer.publish({
+        channel: getPubSubChannel['room'](roomId),
+        action: Actions.OffCamera,
+        args: {
+          peerIds,
+        },
+      });
 
-        const room = Room.getRoom(roomId);
+      const room = Room.getRoom(roomId);
 
-        if (room) {
-          const peers = room.getPeers();
-          peerIds.forEach(id => {
-            const peer = peers.find(peer => id === peer.id);
-            if (peer)
-              peer.sendMessage({
-                message: {
-                  action: Actions.OffCamera,
-                  args: {},
-                },
-              });
-          });
-        }
-
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
+      if (room) {
+        const peers = room.getPeers();
+        peerIds.forEach(id => {
+          const peer = peers.find(peer => id === peer.id);
+          if (peer)
+            peer.sendMessage({
+              message: {
+                action: Actions.OffCamera,
+                args: {},
+              },
+            });
         });
       }
+
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.StopScreen]: async (args, callback) => {
-      try {
-        const { roomId } = this.connection.data;
-        const data = ValidationSchema.peerIds.parse(args);
-        const { peerIds } = data;
+      const { roomId } = this.connection.data;
+      const data = ValidationSchema.peerIds.parse(args);
+      const { peerIds } = data;
 
-        redisServer.publish({
-          channel: getPubSubChannel['room'](roomId),
-          action: Actions.StopScreen,
-          args: {
-            peerIds,
-          },
-        });
+      redisServer.publish({
+        channel: getPubSubChannel['room'](roomId),
+        action: Actions.StopScreen,
+        args: {
+          peerIds,
+        },
+      });
 
-        const room = Room.getRoom(roomId);
+      const room = Room.getRoom(roomId);
 
-        if (room) {
-          const peers = room.getPeers();
-          peerIds.forEach(id => {
-            const peer = peers.find(peer => id === peer.id);
-            if (peer)
-              peer.sendMessage({
-                message: {
-                  action: Actions.StopScreen,
-                  args: {},
-                },
-              });
-          });
-        }
-
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
+      if (room) {
+        const peers = room.getPeers();
+        peerIds.forEach(id => {
+          const peer = peers.find(peer => id === peer.id);
+          if (peer)
+            peer.sendMessage({
+              message: {
+                action: Actions.StopScreen,
+                args: {},
+              },
+            });
         });
       }
+
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.RaiseHand]: async (args, callback) => {
-      try {
-        // set hand
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      // set hand
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.LowerHands]: async (args, callback) => {
-      try {
-        const { roomId } = this.connection.data;
-        const data = ValidationSchema.peerIds.parse(args);
-        const { peerIds } = data;
+      const { roomId } = this.connection.data;
+      const data = ValidationSchema.peerIds.parse(args);
+      const { peerIds } = data;
 
-        redisServer.publish({
-          channel: getPubSubChannel['room'](roomId),
-          action: Actions.LowerHands,
-          args: {
-            peerIds,
-          },
-        });
+      redisServer.publish({
+        channel: getPubSubChannel['room'](roomId),
+        action: Actions.LowerHands,
+        args: {
+          peerIds,
+        },
+      });
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.SendChat]: async (args, callback) => {
-      try {
-        console.log('Send Chat', args);
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      console.log('Send Chat', args);
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.SendReaction]: async (args, callback) => {
-      try {
-        console.log('Send Reaction', args);
+      console.log('Send Reaction', args);
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.Record]: async (args, callback) => {
-      try {
-        console.log('Record', args);
-
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
 
     [Actions.EndMeeting]: async (args, callback) => {
-      try {
-        console.log('EndMeeting', args);
+      console.log('EndMeeting', args);
 
-        callback({
-          status: 'success',
-        });
-      } catch (error) {
-        console.log(error);
-        callback({
-          status: 'error',
-          error,
-        });
-      }
+      callback({
+        status: 'success',
+      });
     },
   };
 }

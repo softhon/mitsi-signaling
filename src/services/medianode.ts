@@ -145,7 +145,7 @@ class MediaNode extends EventEmitter {
     // Handle existing connection with same ID
     if (MediaNode.mediaNodes.has(this.id)) {
       console.warn(
-        `⚠️  MediaNode with ID ${this.id} already exists, disconnecting old instance`
+        `MediaNode with ID ${this.id} already exists, disconnecting old instance`
       );
       const oldNode = MediaNode.mediaNodes.get(this.id);
       oldNode?.disconnect().catch(console.error);
@@ -155,7 +155,7 @@ class MediaNode extends EventEmitter {
 
     // Start connection process
     this.connect().catch(error => {
-      console.error(`❌ Initial connection failed for node ${this.id}:`, error);
+      console.error(`Initial connection failed for node ${this.id}:`, error);
     });
   }
 
@@ -168,27 +168,19 @@ class MediaNode extends EventEmitter {
       const redisData = await redisServer.sMembers(getRedisKey['medianodes']());
 
       if (!redisData.length) {
-        console.log('📭 No running media nodes found in Redis');
+        console.log('No running media nodes found in Redis');
         return [];
       }
-
-      console.log(
-        `🔍 Found ${redisData.length} running media nodes, connecting...`
-      );
-
       const connectionPromises = redisData.map(async data => {
         try {
           const mediaNodesData: MediaNodeData = JSON.parse(data);
 
           console.log(
-            `🔄 Creating connection to node ${mediaNodesData.id} at ${mediaNodesData.ip}:${mediaNodesData.grpcPort}`
+            `Creating connection to node ${mediaNodesData.id} at ${mediaNodesData.ip}:${mediaNodesData.grpcPort}`
           );
           return new MediaNode(mediaNodesData);
         } catch (parseError) {
-          console.error(
-            `❌ Failed to parse media node data: ${data}`,
-            parseError
-          );
+          console.error(`Failed to parse media node data: ${data}`, parseError);
           return null;
         }
       });
@@ -201,16 +193,16 @@ class MediaNode extends EventEmitter {
           nodes.push(result.value);
         } else if (result.status === 'rejected') {
           console.error(
-            `❌ Failed to create connection to node ${index}:`,
+            `Failed to create connection to node ${index}:`,
             result.reason
           );
         }
       });
 
-      console.log(`✅ Created ${nodes.length} media node connections`);
+      console.log(`Created ${nodes.length} media node connections`);
       return nodes;
     } catch (error) {
-      console.error('❌ Error connecting to running nodes:', error);
+      console.error(' Error connecting to running nodes:', error);
       throw error;
     }
   }
@@ -363,7 +355,7 @@ class MediaNode extends EventEmitter {
     context: string = 'unknown'
   ): void {
     console.error(
-      `💥 Connection error for MediaNode ${this.id} [${context}]:`,
+      `Connection error for MediaNode ${this.id} [${context}]:`,
       error.message
     );
 
@@ -606,32 +598,27 @@ class MediaNode extends EventEmitter {
     action: Actions,
     args?: { [key: string]: unknown }
   ): Promise<ResponseData> {
-    try {
-      if (!this.grpcCall) {
-        throw `Cannot send message to MediaNode ${this.id}: not connected`;
-      }
-
-      const requestId = crypto.randomUUID();
-
-      const message: MessageRequest = {
-        action,
-        args: JSON.stringify(args || {}),
-        requestId,
-      };
-
-      return new Promise<ResponseData>((resolve, reject) => {
-        if (this.grpcCall) {
-          this.pendingRequests.set(requestId, {
-            resolve,
-            reject,
-          }); // save resolve
-          this.grpcCall.write(message);
-        }
-      });
-    } catch (error) {
-      console.error(`Error sending message to MediaNode ${this.id}:`, error);
-      throw error;
+    if (!this.grpcCall) {
+      throw `Cannot send message to MediaNode ${this.id}: not connected`;
     }
+
+    const requestId = crypto.randomUUID();
+
+    const message: MessageRequest = {
+      action,
+      args: JSON.stringify(args || {}),
+      requestId,
+    };
+
+    return new Promise<ResponseData>((resolve, reject) => {
+      if (this.grpcCall) {
+        this.pendingRequests.set(requestId, {
+          resolve,
+          reject,
+        }); // save resolve
+        this.grpcCall.write(message);
+      }
+    });
   }
 
   private generateMessageId(): string {
@@ -679,76 +666,6 @@ class MediaNode extends EventEmitter {
     });
   }
 
-  private handleIncomingMessage(message: MessageResponse): void {
-    try {
-      const { action, args, requestId } = message;
-      if (!action) return;
-
-      const parsedArgs = parseArguments(args);
-
-      if (requestId?.length) {
-        console.log('Got a request expecting response');
-        const pendingRequest = this.pendingRequests.get(requestId);
-        if (pendingRequest) {
-          // this means this instance initiated this request for response .
-          // resolve and return
-          if (parsedArgs.status === 'error') {
-            console.log(action, 'pending request Returned error');
-            pendingRequest.reject(parsedArgs.error as Error);
-          } else {
-            const response = parsedArgs.response as { [key: string]: unknown };
-            console.log(action, 'pending request Returned success');
-            pendingRequest.resolve(response);
-          }
-          this.pendingRequests.delete(requestId);
-          return;
-        }
-      }
-
-      console.log(`Received message from MediaNode ${this.id}: ${action}`);
-
-      // Handle system messages
-      if (action === Actions.Heartbeat) {
-        this.handleHeartbeat(parsedArgs);
-        return;
-      }
-
-      if (action === Actions.ServerShutdown) {
-        this.handleServerShutdown(parsedArgs);
-        return;
-      }
-
-      // Find and execute handler
-      const handler = this.actionHandlers[action as Actions];
-      if (handler) {
-        try {
-          handler(parsedArgs, requestId);
-        } catch (handlerError) {
-          console.error(
-            `Error in handler for action ${action} from ${this.id}:`,
-            handlerError
-          );
-        }
-      } else {
-        console.warn(`No handler for action ${action} from ${this.id}`);
-        this.emit('unhandledMessage', {
-          nodeId: this.id,
-          action,
-          args: parsedArgs,
-        });
-      }
-
-      this.emit('messageReceived', {
-        nodeId: this.id,
-        action,
-        args: parsedArgs,
-        timestamp: new Date(),
-      });
-    } catch (error) {
-      console.error(`Error handling message from ${this.id}:`, error);
-    }
-  }
-
   private handleHeartbeat(args: { [key: string]: unknown }): void {
     console.log(args);
     // Respond to heartbeat
@@ -774,21 +691,14 @@ class MediaNode extends EventEmitter {
 
     // Send disconnect message if connected
     if (this.isConnected) {
-      try {
-        this.sendMessage(Actions.Disconnect, {
-          reason: 'client_disconnect',
-          connectionId: this.connectionId,
-          timestamp: Date.now(),
-        });
+      this.sendMessage(Actions.Disconnect, {
+        reason: 'client_disconnect',
+        connectionId: this.connectionId,
+        timestamp: Date.now(),
+      });
 
-        // Give time for the message to be sent
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (error) {
-        console.warn(
-          `Error sending disconnect message for node ${this.id}:`,
-          error
-        );
-      }
+      // Give time for the message to be sent
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     this.cleanup();
@@ -815,50 +725,33 @@ class MediaNode extends EventEmitter {
     response: { [key: string]: unknown }
   ): void {
     if (!this.grpcCall) {
-      console.warn(
-        `⚠️Cannot send message to MediaNode ${this.id}: not connected`
-      );
-      return;
+      throw `Cannot send message to MediaNode ${this.id}: not connected`;
     }
+    const message: MessageRequest = {
+      action,
+      requestId,
+      args: JSON.stringify({
+        status: 'success',
+        response,
+      }),
+    };
 
-    try {
-      const message: MessageRequest = {
-        action,
-        requestId,
-        args: JSON.stringify({
-          status: 'success',
-          response,
-        }),
-      };
-
-      this.grpcCall.write(message);
-    } catch (error) {
-      console.error(`Error sending message to MediaNode ${this.id}:`, error);
-      throw error;
-    }
+    this.grpcCall.write(message);
   }
   sendError(action: Actions, requestId: string, error: Error | unknown): void {
     if (!this.grpcCall) {
-      console.warn(
-        `⚠️Cannot send message to MediaNode ${this.id}: not connected`
-      );
-      return;
+      throw `Cannot send message to MediaNode ${this.id}: not connected`;
     }
-    try {
-      const message: MessageRequest = {
-        action,
-        requestId,
-        args: JSON.stringify({
-          status: 'error',
-          error,
-        }),
-      };
+    const message: MessageRequest = {
+      action,
+      requestId,
+      args: JSON.stringify({
+        status: 'error',
+        error,
+      }),
+    };
 
-      this.grpcCall.write(message);
-    } catch (error) {
-      console.error(`Error sending message to MediaNode ${this.id}:`, error);
-      throw error;
-    }
+    this.grpcCall.write(message);
   }
 
   // Static methods for managing all nodes
@@ -934,33 +827,58 @@ class MediaNode extends EventEmitter {
     );
   }
 
+  private handleIncomingMessage(message: MessageResponse): void {
+    const { action, args, requestId } = message;
+    if (!action) return;
+
+    const parsedArgs = parseArguments(args);
+
+    if (requestId?.length) {
+      const pendingRequest = this.pendingRequests.get(requestId);
+      if (pendingRequest) {
+        if (parsedArgs.status === 'error') {
+          pendingRequest.reject(parsedArgs.error as Error);
+        } else {
+          const response = parsedArgs.response as { [key: string]: unknown };
+          pendingRequest.resolve(response);
+        }
+        this.pendingRequests.delete(requestId);
+        return;
+      }
+    }
+
+    // Find and execute handler
+    const handler = this.actionHandlers[action as Actions];
+    if (handler) {
+      handler(parsedArgs, requestId).catch(error => {
+        console.error('Error =>', action, error);
+      });
+    } else {
+      console.warn(`No handler for action ${action} from ${this.id}`);
+    }
+  }
+
   // Action handlers for different message types
   private actionHandlers: {
     [key in Actions]?: (
       args: { [key: string]: unknown },
       requestId?: string
-    ) => void;
+    ) => Promise<void>;
   } = {
-    [Actions.Connected]: args => {
-      // console.log(`Connection confirmed from node ${this.id}:`, args);
-      this.emit('connectionConfirmed', { nodeId: this.id, args });
+    [Actions.Connected]: async args => {
       this.routerRtpCapabilities =
         args.routerRtpCapabilities as mediasoupTypes.RtpCapabilities;
     },
 
-    [Actions.Heartbeat]: args => {
+    [Actions.Heartbeat]: async args => {
       this.handleHeartbeat(args);
     },
 
-    [Actions.HeartbeatAck]: args => {
-      console.log(`Heartbeat acknowledged by ${this.id}`, args);
-    },
-
-    [Actions.ServerShutdown]: args => {
+    [Actions.ServerShutdown]: async args => {
       this.handleServerShutdown(args);
     },
 
-    [Actions.ConsumerCreated]: (args, requestId) => {
+    [Actions.ConsumerCreated]: async (args, requestId) => {
       console.log(args, 'consumer');
       const { peerId, roomId } =
         ValidationSchema.createConsumerData.parse(args);
@@ -995,8 +913,8 @@ class MediaNode extends EventEmitter {
       });
     },
 
-    [Actions.ConsumerPaused]: args => {
-      console.log(args, 'consumer');
+    [Actions.ConsumerPaused]: async args => {
+      console.log(Actions.ConsumerPaused);
       const { peerId, roomId } = ValidationSchema.ConsumerStateData.parse(args);
       const room = Room.getRoom(roomId);
       const peer = room?.getPeer(peerId);
@@ -1010,7 +928,7 @@ class MediaNode extends EventEmitter {
       console.log(Actions.ConsumerPaused);
     },
 
-    [Actions.ConsumerResumed]: args => {
+    [Actions.ConsumerResumed]: async args => {
       console.log(args, 'consumer');
       const { peerId, roomId } = ValidationSchema.ConsumerStateData.parse(args);
       const room = Room.getRoom(roomId);
@@ -1025,7 +943,7 @@ class MediaNode extends EventEmitter {
       console.log(Actions.ConsumerResumed);
     },
 
-    [Actions.ConsumerClosed]: args => {
+    [Actions.ConsumerClosed]: async args => {
       console.log(args, 'consumer');
       const { peerId, roomId } = ValidationSchema.ConsumerStateData.parse(args);
       const room = Room.getRoom(roomId);
