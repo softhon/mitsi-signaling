@@ -84,6 +84,19 @@ export const ValidationSchema = {
     producerPaused: z.boolean(),
   }),
 
+  medianodeConnectionData: z.object({
+    status: z.enum(['success', 'failed']),
+    nodeId: z.string(),
+    connectionId: z.string(),
+    message: z.string(),
+    timestamp: z.number(),
+    // serverMetrics: z.any(),
+    routerRtpCapabilities: z
+      .any()
+      .refine(value => value, 'Can not be null or undefined'),
+    appData: z.any(),
+  }),
+
   ConsumerStateData: roomIdPeerIdSchema.extend({
     consumerId: z.string(),
     producerPeerId: z.string(),
@@ -108,17 +121,5 @@ export const ValidationSchema = {
   consumer: z.object({
     consumerId: z.string(),
     source: z.enum(['mic', 'camera', 'screen']),
-  }),
-};
-
-export const MidialSignalingSchema = {
-  connected: z.object({
-    status: z.enum(['SUCCESS', 'FAILED']),
-    nodeId: z.string(),
-    connectionId: z.string(),
-    message: z.string(),
-    timestamp: z.number(),
-    serverMetrics: z.any(),
-    routerRtpCapabilities: z.any(),
   }),
 };

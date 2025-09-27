@@ -66,6 +66,7 @@ class Peer extends Base {
 
     this.heartBeatInterval = setInterval(() => {
       if (Date.now() - this.lastHeartbeat > HEARTBEAT_TIMEOUT) {
+        console.log('Peer heart beat failed --- closing peer');
         this.close();
       }
     }, HEARTBEAT_TIMEOUT);
@@ -97,6 +98,9 @@ class Peer extends Base {
       joined: this.joined,
       reconnecting: this.reconnecting,
     };
+  }
+  updateLastHeartBeat(): void {
+    this.lastHeartbeat = Date.now();
   }
 
   handleConnection(): void {
@@ -131,7 +135,6 @@ class Peer extends Base {
   } = {
     [Actions.CreateWebrtcTransports]: async (args, callback) => {
       const { roomId, peerId } = this.connection.data;
-      console.log('CreateWebrtcTransports');
       const response = await this.medianode.sendMessageForResponse(
         Actions.CreateWebrtcTransports,
         {
@@ -139,7 +142,6 @@ class Peer extends Base {
           roomId,
         }
       );
-      console.log('CreateWebrtcTransports', response);
       //todo return response not message response
       callback({
         status: 'success',
@@ -387,6 +389,15 @@ class Peer extends Base {
         });
       }
 
+      callback({
+        status: 'success',
+      });
+    },
+
+    [Actions.Heartbeat]: async (args, callback) => {
+      console.log('Got heart beat', Date.now());
+
+      this.updateLastHeartBeat();
       callback({
         status: 'success',
       });

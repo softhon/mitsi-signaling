@@ -28,31 +28,6 @@ const protoDescriptor = grpc.loadPackageDefinition(
   packageDefinition
 ) as unknown as ProtoGrpcType;
 
-enum ConnectionState {
-  DISCONNECTED = 'DISCONNECTED',
-  CONNECTING = 'CONNECTING',
-  CONNECTED = 'CONNECTED',
-  RECONNECTING = 'RECONNECTING',
-  FAILED = 'FAILED',
-  CIRCUIT_OPEN = 'CIRCUIT_OPEN',
-}
-
-interface ReconnectConfig {
-  maxRetries: number;
-  initialDelay: number;
-  maxDelay: number;
-  backoffMultiplier: number;
-  jitterMax: number;
-  resetTimeout: number;
-}
-
-interface CircuitBreakerConfig {
-  failureThreshold: number;
-  successThreshold: number;
-  timeout: number;
-  monitoringPeriod: number;
-}
-
 class MediaNode extends EventEmitter {
   id: string;
   private ip: string;
@@ -65,19 +40,13 @@ class MediaNode extends EventEmitter {
   > | null;
   private routerRtpCapabilities: mediasoupTypes.RtpCapabilities | null;
 
-  private connectionState: ConnectionState;
-  private reconnectAttempts: number;
   private reconnectTimer: NodeJS.Timeout | null;
   private healthCheckTimer: NodeJS.Timeout | null;
   private connectionTimeout: NodeJS.Timeout | null;
   private circuitBreakerTimer: NodeJS.Timeout | null;
 
-  private readonly reconnectConfig: ReconnectConfig;
-  private readonly circuitBreakerConfig: CircuitBreakerConfig;
   private readonly clientId: string;
   private readonly connectionId: string;
-
-  private isShuttingDown: boolean;
 
   private readonly maxQueueSize: number = 1000;
   private readonly messageTimeout: number = 30000;
@@ -91,15 +60,11 @@ class MediaNode extends EventEmitter {
     ip = '0.0.0.0',
     address,
     grpcPort = 50052,
-    reconnectConfig = {},
-    circuitBreakerConfig = {},
   }: {
     id: string;
     ip: string;
     address: string;
     grpcPort?: string | number;
-    reconnectConfig?: Partial<ReconnectConfig>;
-    circuitBreakerConfig?: Partial<CircuitBreakerConfig>;
   }) {
     super();
     this.id = id;
@@ -113,8 +78,6 @@ class MediaNode extends EventEmitter {
 
     this.pendingRequests = new Map();
 
-    this.connectionState = ConnectionState.DISCONNECTED;
-    this.reconnectAttempts = 0;
     this.reconnectTimer = null;
     this.healthCheckTimer = null;
     this.connectionTimeout = null;
@@ -122,33 +85,13 @@ class MediaNode extends EventEmitter {
 
     this.clientId = config.nodeId;
     this.connectionId = this.generateConnectionId();
-    this.isShuttingDown = false;
-
-    this.reconnectConfig = {
-      maxRetries: 20,
-      initialDelay: 1000,
-      maxDelay: 60000,
-      backoffMultiplier: 1.5,
-      jitterMax: 1000,
-      resetTimeout: 300000, // 5 minutes
-      ...reconnectConfig,
-    };
-
-    this.circuitBreakerConfig = {
-      failureThreshold: 5,
-      successThreshold: 3,
-      timeout: 60000, // 1 minute
-      monitoringPeriod: 30000, // 30 seconds
-      ...circuitBreakerConfig,
-    };
 
     // Handle existing connection with same ID
     if (MediaNode.mediaNodes.has(this.id)) {
       console.warn(
         `MediaNode with ID ${this.id} already exists, disconnecting old instance`
       );
-      const oldNode = MediaNode.mediaNodes.get(this.id);
-      oldNode?.disconnect().catch(console.error);
+      // todo -> get and  disconnect old node
     }
 
     MediaNode.mediaNodes.set(this.id, this);
@@ -164,57 +107,35 @@ class MediaNode extends EventEmitter {
   }
 
   static async connectToRunningNodes(): Promise<MediaNode[]> {
-    try {
-      const redisData = await redisServer.sMembers(getRedisKey['medianodes']());
+    const redisData = await redisServer.sMembers(getRedisKey['medianodes']());
 
-      if (!redisData.length) {
-        console.log('No running media nodes found in Redis');
-        return [];
-      }
-      const connectionPromises = redisData.map(async data => {
-        try {
-          const mediaNodesData: MediaNodeData = JSON.parse(data);
-
-          console.log(
-            `Creating connection to node ${mediaNodesData.id} at ${mediaNodesData.ip}:${mediaNodesData.grpcPort}`
-          );
-          return new MediaNode(mediaNodesData);
-        } catch (parseError) {
-          console.error(`Failed to parse media node data: ${data}`, parseError);
-          return null;
-        }
-      });
-
-      const results = await Promise.allSettled(connectionPromises);
-      const nodes: MediaNode[] = [];
-
-      results.forEach((result, index) => {
-        if (result.status === 'fulfilled' && result.value) {
-          nodes.push(result.value);
-        } else if (result.status === 'rejected') {
-          console.error(
-            `Failed to create connection to node ${index}:`,
-            result.reason
-          );
-        }
-      });
-
-      console.log(`Created ${nodes.length} media node connections`);
-      return nodes;
-    } catch (error) {
-      console.error(' Error connecting to running nodes:', error);
-      throw error;
+    if (!redisData.length) {
+      console.log('No running media nodes found in Redis');
+      return [];
     }
+    const connectionPromises = redisData.map(async data => {
+      const mediaNodesData: MediaNodeData = JSON.parse(data);
+      new MediaNode(mediaNodesData);
+    });
+
+    const results = await Promise.allSettled(connectionPromises);
+    const nodes: MediaNode[] = [];
+
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value) {
+        nodes.push(result.value);
+      } else if (result.status === 'rejected') {
+        console.error(
+          `Failed to create connection to node ${index}:`,
+          result.reason
+        );
+      }
+    });
+
+    console.log(`Created ${nodes.length} media node connections`);
+    return nodes;
   }
 
-  // Getters
-  get isConnected(): boolean {
-    return this.connectionState === ConnectionState.CONNECTED;
-  }
-
-  get state(): ConnectionState {
-    return this.connectionState;
-  }
   getRouterRtpCapabilities(): mediasoupTypes.RtpCapabilities | null {
     return this.routerRtpCapabilities;
   }
@@ -228,49 +149,8 @@ class MediaNode extends EventEmitter {
     return null;
   }
 
-  // State management
-  private setState(newState: ConnectionState): void {
-    if (this.connectionState !== newState) {
-      const oldState = this.connectionState;
-      this.connectionState = newState;
-
-      console.log(`📡 MediaNode ${this.id} state: ${oldState} -> ${newState}`);
-      this.emit('stateChanged', {
-        nodeId: this.id,
-        oldState,
-        newState,
-        timestamp: new Date(),
-      });
-    }
-  }
-
-  // Circuit breaker pattern
-  private shouldAttemptConnection(): boolean {
-    if (this.connectionState === ConnectionState.CIRCUIT_OPEN) {
-      return false;
-    }
-
-    return true;
-  }
-
-  // Connection management
-  private calculateReconnectDelay(): number {
-    const baseDelay = Math.min(
-      this.reconnectConfig.initialDelay *
-        Math.pow(
-          this.reconnectConfig.backoffMultiplier,
-          this.reconnectAttempts
-        ),
-      this.reconnectConfig.maxDelay
-    );
-
-    // Add jitter to prevent thundering herd
-    const jitter = Math.random() * this.reconnectConfig.jitterMax;
-    return baseDelay + jitter;
-  }
-
   private cleanup(): void {
-    console.log(`🧹 Cleaning up MediaNode ${this.id} connections and timers`);
+    console.log(`Cleaning up MediaNode ${this.id} connections and timers`);
 
     // Clear all timers
     this.clearTimers();
@@ -295,10 +175,7 @@ class MediaNode extends EventEmitter {
         this.grpcClient.close();
         this.grpcClient = null;
       } catch (error) {
-        console.warn(
-          `⚠️  Error closing gRPC client for node ${this.id}:`,
-          error
-        );
+        console.warn(`Error closing gRPC client for node ${this.id}:`, error);
       }
     }
   }
@@ -324,193 +201,61 @@ class MediaNode extends EventEmitter {
     this.circuitBreakerTimer = null;
   }
 
-  private setupHealthCheck(): void {
-    if (this.healthCheckTimer) {
-      clearInterval(this.healthCheckTimer);
-    }
-
-    this.healthCheckTimer = setInterval(() => {
-      if (this.isConnected && this.grpcCall) {
-        try {
-          // Send ping to verify connection health
-          // this.sendMessage(MSA.Ping, {
-          //   timestamp: Date.now(),
-          //   connectionId: this.connectionId,
-          // });
-          // const pingResponse = this.sendMessageForResponse(MSA.Ping, {
-          //   timestamp: Date.now(),
-          //   connectionId: this.connectionId,
-          // });
-          // console.log('Got response from message', { pingResponse });
-        } catch (error) {
-          console.warn(`Health check failed for node ${this.id}:`, error);
-          this.handleConnectionError(error as Error, 'health_check_failed');
-        }
-      }
-    }, 30000); // Health check every 30 seconds
-  }
-
-  private handleConnectionError(
-    error: Error,
-    context: string = 'unknown'
-  ): void {
-    console.error(
-      `Connection error for MediaNode ${this.id} [${context}]:`,
-      error.message
-    );
-
-    this.setState(ConnectionState.DISCONNECTED);
-    this.emit('connectionError', {
-      nodeId: this.id,
-      error,
-      context,
-      timestamp: new Date(),
-    });
-
-    if (!this.isShuttingDown) {
-      this.scheduleReconnect();
-    }
-  }
-
-  private scheduleReconnect(): void {
-    if (!this.shouldAttemptConnection()) {
-      return;
-    }
-
-    if (this.reconnectAttempts >= this.reconnectConfig.maxRetries) {
-      console.error(
-        `Max reconnection attempts (${this.reconnectConfig.maxRetries}) reached for node ${this.id}`
-      );
-      this.setState(ConnectionState.FAILED);
-      this.emit('connectionFailed', {
-        nodeId: this.id,
-        attempts: this.reconnectAttempts,
-        timestamp: new Date(),
-      });
-      return;
-    }
-
-    const delay = this.calculateReconnectDelay();
-    console.log(
-      `Scheduling reconnection attempt ${this.reconnectAttempts + 1}/${this.reconnectConfig.maxRetries} for node ${this.id} in ${Math.round(delay)}ms`
-    );
-
-    this.setState(ConnectionState.RECONNECTING);
-
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-    }
-
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectAttempts++;
-      this.connect().catch(error => {
-        console.error(
-          ` Scheduled reconnection failed for node ${this.id}:`,
-          error
-        );
-      });
-    }, delay);
-  }
-
   async connect(): Promise<void> {
-    if (this.isShuttingDown) {
-      console.log(
-        `Node ${this.id} is shutting down, skipping connection attempt`
-      );
-      return;
-    }
-
-    if (this.connectionState === ConnectionState.CONNECTING) {
-      console.log(`Connection already in progress for node ${this.id}`);
-      return;
-    }
-
-    if (!this.shouldAttemptConnection()) {
-      console.log(
-        `Circuit breaker prevents connection attempt for node ${this.id}`
-      );
-      return;
-    }
-
-    this.setState(ConnectionState.CONNECTING);
     this.cleanup(); // Clean up any existing connections
 
-    try {
-      console.log(
-        `Connecting to MediaNode ${this.id} at ${this.ip}:${this.grpcPort} (attempt ${this.reconnectAttempts + 1})`
-      );
+    // Set connection timeout
+    const connectionPromise = this.establishConnection();
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      this.connectionTimeout = setTimeout(() => {
+        reject(new Error(`Connection timeout after 15 seconds`));
+      }, 15000);
+    });
 
-      // Set connection timeout
-      const connectionPromise = this.establishConnection();
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        this.connectionTimeout = setTimeout(() => {
-          reject(new Error(`Connection timeout after 15 seconds`));
-        }, 15000);
-      });
+    await Promise.race([connectionPromise, timeoutPromise]);
 
-      await Promise.race([connectionPromise, timeoutPromise]);
-
-      // Clear connection timeout on success
-      if (this.connectionTimeout) {
-        clearTimeout(this.connectionTimeout);
-        this.connectionTimeout = null;
-      }
-
-      this.setState(ConnectionState.CONNECTED);
-      this.reconnectAttempts = 0;
-      this.setupHealthCheck();
-
-      this.emit('connected', {
-        nodeId: this.id,
-        connectionId: this.connectionId,
-        address: `${this.ip}:${this.grpcPort}`,
-        timestamp: new Date(),
-      });
-
-      // Send initial connection message
-      this.sendMessage(Actions.Connected, {
-        status: 'success',
-        nodeId: this.clientId,
-        connectionId: this.connectionId,
-        timestamp: Date.now(),
-        message: 'Successfully connected to Media Signaling Server',
-      });
-
-      console.log('sendMessageForResponse - 1');
-
-      const pingResponse = await this.sendMessageForResponse(Actions.Ping, {
-        timestamp: Date.now(),
-        connectionId: this.connectionId,
-      });
-
-      console.log('sendMessageForResponse - 2', pingResponse);
-
-      console.log(
-        `Successfully connected to MediaNode ${this.id} at ${this.ip}:${this.grpcPort}`
-      );
-    } catch (error) {
-      console.error(`Failed to connect to MediaNode ${this.id}:`, error);
-      this.handleConnectionError(error as Error, 'connection_failed');
+    // Clear connection timeout on success
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
     }
+
+    // Send initial connection message
+    this.sendMessage(Actions.Connected, {
+      status: 'success',
+      nodeId: this.clientId,
+      connectionId: this.connectionId,
+      timestamp: Date.now(),
+      message: 'Successfully connected to Media Signaling Server',
+    });
+
+    // await this.sendMessageForResponse(Actions.Ping, {
+    //   timestamp: Date.now(),
+    //   connectionId: this.connectionId,
+    // });
+
+    console.log(
+      `Successfully connected to MediaNode ${this.id} at ${this.ip}:${this.grpcPort}`
+    );
   }
 
   private async establishConnection(): Promise<void> {
     // Create gRPC client with proper options
     this.grpcClient = new protoDescriptor.mediaSignalingPackage.MediaSignaling(
       `${this.ip}:${this.grpcPort}`,
-      grpc.credentials.createInsecure(),
-      {
-        'grpc.keepalive_time_ms': 10000,
-        'grpc.keepalive_timeout_ms': 5000,
-        'grpc.keepalive_permit_without_calls': 1,
-        'grpc.http2.max_pings_without_data': 0,
-        'grpc.http2.min_time_between_pings_ms': 10000,
-        'grpc.http2.min_ping_interval_without_data_ms': 300000,
-        'grpc.max_receive_message_length': 4 * 1024 * 1024, // 4MB
-        'grpc.max_send_message_length': 4 * 1024 * 1024, // 4MB
-        'grpc.initial_reconnect_backoff_ms': 1000,
-        'grpc.max_reconnect_backoff_ms': 10000,
-      }
+      grpc.credentials.createInsecure()
+      // {
+      //   'grpc.keepalive_time_ms': 10000,
+      //   'grpc.keepalive_timeout_ms': 5000,
+      //   'grpc.keepalive_permit_without_calls': 1,
+      //   'grpc.http2.max_pings_without_data': 0,
+      //   'grpc.http2.min_time_between_pings_ms': 10000,
+      //   'grpc.http2.min_ping_interval_without_data_ms': 300000,
+      //   'grpc.max_receive_message_length': 4 * 1024 * 1024, // 4MB
+      //   'grpc.max_send_message_length': 4 * 1024 * 1024, // 4MB
+      //   'grpc.initial_reconnect_backoff_ms': 1000,
+      //   'grpc.max_reconnect_backoff_ms': 10000,
+      // }
     );
 
     // Wait for client to be ready
@@ -558,6 +303,7 @@ class MediaNode extends EventEmitter {
       }, 5000);
 
       const onConfirmation = (): void => {
+        console.log('Got confirmation');
         clearTimeout(timeout);
         this.off('connectionConfirmed', onConfirmation);
         resolve();
@@ -568,30 +314,15 @@ class MediaNode extends EventEmitter {
   }
 
   // Message handling
-  sendMessage(action: Actions, args?: { [key: string]: unknown }): boolean {
+  sendMessage(action: Actions, args?: { [key: string]: unknown }): void {
     if (!this.grpcCall) {
-      console.warn(
-        `Cannot send message to MediaNode ${this.id}: not connected`
-      );
-      return false;
+      throw `Cannot send message to MediaNode ${this.id}: not connected`;
     }
-
-    try {
-      const message = {
-        action,
-        args: JSON.stringify(args || {}),
-      };
-
-      this.grpcCall.write(message);
-
-      console.log(`Sent ${action} to MediaNode ${this.id}`);
-
-      return true;
-    } catch (error) {
-      console.error(`Error sending message to MediaNode ${this.id}:`, error);
-      this.handleConnectionError(error as Error, 'send_message_error');
-      return false;
-    }
+    const message = {
+      action,
+      args: JSON.stringify(args || {}),
+    };
+    this.grpcCall.write(message);
   }
 
   async sendMessageForResponse(
@@ -636,33 +367,18 @@ class MediaNode extends EventEmitter {
     // Handle connection events
     this.grpcCall.on('end', () => {
       console.log(`MediaNode ${this.id} ended the connection`);
-      this.handleConnectionError(
-        new Error('Connection ended by remote'),
-        'remote_end'
-      );
     });
 
     this.grpcCall.on('error', (error: Error) => {
       console.error(`Stream error for MediaNode ${this.id}:`, error);
-      this.handleConnectionError(error, 'stream_error');
     });
 
     this.grpcCall.on('close', () => {
       console.log(`Stream closed for MediaNode ${this.id}`);
-      if (this.connectionState === ConnectionState.CONNECTED) {
-        this.handleConnectionError(
-          new Error('Stream closed unexpectedly'),
-          'unexpected_close'
-        );
-      }
     });
 
     this.grpcCall.on('cancelled', () => {
       console.log(`Stream cancelled for MediaNode ${this.id}`);
-      this.handleConnectionError(
-        new Error('Stream cancelled'),
-        'stream_cancelled'
-      );
     });
   }
 
@@ -673,50 +389,6 @@ class MediaNode extends EventEmitter {
       timestamp: Date.now(),
       connectionId: this.connectionId,
     });
-  }
-
-  private handleServerShutdown(args: { [key: string]: unknown }): void {
-    console.log(`Server shutdown notification from ${this.id}:`, args);
-    this.emit('serverShutdown', { nodeId: this.id, args });
-
-    // Don't attempt to reconnect immediately after server shutdown
-    this.setState(ConnectionState.DISCONNECTED);
-    this.scheduleReconnect();
-  }
-
-  // Connection lifecycle
-  async disconnect(): Promise<void> {
-    console.log(`👋 Disconnecting MediaNode ${this.id}`);
-    this.isShuttingDown = true;
-
-    // Send disconnect message if connected
-    if (this.isConnected) {
-      this.sendMessage(Actions.Disconnect, {
-        reason: 'client_disconnect',
-        connectionId: this.connectionId,
-        timestamp: Date.now(),
-      });
-
-      // Give time for the message to be sent
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
-    this.cleanup();
-    this.setState(ConnectionState.DISCONNECTED);
-    MediaNode.mediaNodes.delete(this.id);
-
-    this.emit('disconnected', {
-      nodeId: this.id,
-      timestamp: new Date(),
-    });
-  }
-
-  forceDisconnect(reason: string = 'force_disconnect'): void {
-    console.log(`Force disconnecting MediaNode ${this.id} (${reason})`);
-    this.isShuttingDown = true;
-    this.cleanup();
-    this.setState(ConnectionState.DISCONNECTED);
-    MediaNode.mediaNodes.delete(this.id);
   }
 
   sendResponse(
@@ -763,70 +435,6 @@ class MediaNode extends EventEmitter {
     return Array.from(MediaNode.mediaNodes.values());
   }
 
-  static getConnectedNodes(): MediaNode[] {
-    return Array.from(MediaNode.mediaNodes.values()).filter(
-      node => node.isConnected
-    );
-  }
-
-  static getNodesByState(state: ConnectionState): MediaNode[] {
-    return Array.from(MediaNode.mediaNodes.values()).filter(
-      node => node.connectionState === state
-    );
-  }
-
-  static async disconnectAll(): Promise<void> {
-    console.log(
-      ` Disconnecting all ${MediaNode.mediaNodes.size} media nodes...`
-    );
-
-    const nodes = Array.from(MediaNode.mediaNodes.values());
-    const disconnectPromises = nodes.map(node =>
-      node.disconnect().catch(error => {
-        console.warn(`⚠️  Error disconnecting node ${node.id}:`, error);
-        node.forceDisconnect('disconnect_all_force');
-      })
-    );
-
-    await Promise.allSettled(disconnectPromises);
-    MediaNode.mediaNodes.clear();
-    console.log('All media nodes disconnected');
-  }
-
-  static getConnectionStats(): { [key: string]: number } {
-    const stats: { [key: string]: number } = {};
-    Object.values(ConnectionState).forEach(state => {
-      stats[state] = 0;
-    });
-
-    MediaNode.mediaNodes.forEach(node => {
-      stats[node.connectionState]++;
-    });
-
-    return stats;
-  }
-
-  static broadcastMessage(): void {}
-
-  static async reconnectAll(): Promise<void> {
-    console.log('Reconnecting all disconnected media nodes...');
-
-    const disconnectedNodes = MediaNode.getNodesByState(
-      ConnectionState.DISCONNECTED
-    ).concat(MediaNode.getNodesByState(ConnectionState.FAILED));
-
-    const reconnectPromises = disconnectedNodes.map(node =>
-      node.connect().catch(error => {
-        console.warn(`Error reconnecting node ${node.id}:`, error);
-      })
-    );
-
-    await Promise.allSettled(reconnectPromises);
-    console.log(
-      `Reconnection attempts completed for ${disconnectedNodes.length} nodes`
-    );
-  }
-
   private handleIncomingMessage(message: MessageResponse): void {
     const { action, args, requestId } = message;
     if (!action) return;
@@ -866,16 +474,13 @@ class MediaNode extends EventEmitter {
     ) => Promise<void>;
   } = {
     [Actions.Connected]: async args => {
+      this.emit('connectionConfirmed');
       this.routerRtpCapabilities =
         args.routerRtpCapabilities as mediasoupTypes.RtpCapabilities;
     },
 
     [Actions.Heartbeat]: async args => {
       this.handleHeartbeat(args);
-    },
-
-    [Actions.ServerShutdown]: async args => {
-      this.handleServerShutdown(args);
     },
 
     [Actions.ConsumerCreated]: async (args, requestId) => {
@@ -963,4 +568,3 @@ class MediaNode extends EventEmitter {
 }
 
 export default MediaNode;
-export { ConnectionState, MediaNode };

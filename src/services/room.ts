@@ -120,7 +120,7 @@ class Room extends EventEmitter {
           coHostEmails: roomData.coHostEmails,
           started: Date.now(),
           maxPeers: 50,
-          maxDuration: 180, // minutes
+          maxDuration: 60, // minutes
           allowRecording: false,
           allowWaiting: false,
           recording: false,
@@ -161,7 +161,6 @@ class Room extends EventEmitter {
         },
         broadcast: true,
       });
-      console.log('Sent message');
       await this.savePeer(peer);
     } catch (error) {
       console.log(error);
@@ -275,6 +274,7 @@ class Room extends EventEmitter {
   }
 
   private handleCountDown(): void {
+    console.log(this.timeLeft);
     if (this.endCountDownInterval) clearInterval(this.endCountDownInterval);
     this.endCountDownInterval = setInterval(() => {
       this.timeLeft -= 1;
@@ -287,12 +287,17 @@ class Room extends EventEmitter {
 
   private async selfDestructCountDown(): Promise<void> {
     try {
-      if (this.closed || !this.isEmpty()) return;
+      if (this.closed || !this.isEmpty())
+        return console.log('Room self destruct did not continue');
+
+      console.log('Room self destruct called ');
+
       if (this.selfDestructTimeout) clearTimeout(this.selfDestructTimeout);
 
       this.selfDestructTimeout = setTimeout(async () => {
         const peersOnline = await this.getPeersOnline();
         this.close(peersOnline.length === 0);
+        console.log('Room self destruct closed room');
       }, ROOM_TIMEOUT);
     } catch (error) {
       console.error('selfDestructCountDown Failed', error);

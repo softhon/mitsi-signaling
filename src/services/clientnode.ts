@@ -228,7 +228,6 @@ class ClientNode extends EventEmitter {
       }
       const medianode = MediaNode.getleastLoadedNode();
       if (!medianode) throw 'No medianode found';
-      console.log('deviceRtpCapabilities =>', deviceRtpCapabilities);
       const response = await medianode.sendMessageForResponse(
         Actions.CreatePeer,
         {
