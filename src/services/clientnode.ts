@@ -45,8 +45,17 @@ class ClientNode extends EventEmitter {
     this.connection.on('connect_error', error => {
       console.error('client connection error:', error);
     });
-    this.connection.on('disconnect', error => {
-      console.info('client connection disconnect:', error);
+    this.connection.on('disconnect', reason => {
+      console.info('client disconnect: => ', reason);
+      if (
+        reason === 'client namespace disconnect' ||
+        reason === 'server namespace disconnect'
+      ) {
+        this.close();
+      } else {
+        this.emit(Actions.Reconnecting);
+        // this.close();
+      }
     });
     this.connection.on(
       'message',
@@ -66,13 +75,20 @@ class ClientNode extends EventEmitter {
     );
   }
 
-  close(): void {
+  close(silent?: boolean): void {
+    console.log('closing client node');
+
     if (this.closed) return;
     this.closed = true;
+
+    // console.log('closing client node');
+
+    this.emit(Actions.Close, { silent });
     this.connection.disconnect(true);
     ClientNode.clientNodes.delete(this.connectionId);
-    this.emit(Actions.Close);
     this.removeAllListeners();
+    console.log('clientnode Closed');
+    if (!silent) this.connection.disconnect(true);
   }
 
   private actionHandlers: {

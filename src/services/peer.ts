@@ -70,19 +70,8 @@ class Peer extends Base {
         this.close();
       }
     }, HEARTBEAT_TIMEOUT);
-
+    this.handleEvents();
     this.handleConnection();
-  }
-
-  close(silent?: boolean): void {
-    if (this.closed) return;
-    this.closed = true;
-    clearInterval(this.heartBeatInterval);
-
-    this.emit(Actions.Close, { silent });
-    this.removeAllListeners();
-    console.log('Peer', 'Close peer');
-    if (!silent) this.connection.disconnect(true);
   }
 
   getMedianode(): MediaNode {
@@ -103,13 +92,22 @@ class Peer extends Base {
     this.lastHeartbeat = Date.now();
   }
 
+  handleEvents(): void {
+    this.on(Actions.Close, () => {
+      this.cleanUp();
+    });
+  }
+  cleanUp(): void {
+    clearInterval(this.heartBeatInterval);
+  }
+
   handleConnection(): void {
-    this.connection.on('connect_error', error => {
-      console.error('client connection error', error);
-    });
-    this.connection.on('disconnect', error => {
-      console.info('client connection disconnect', error);
-    });
+    // this.connection.on('connect_error', error => {
+    //   console.error('client connection error', error);
+    // });
+    // this.connection.on('disconnect', error => {
+    //   console.info('client connection disconnect', error);
+    // });
     this.connection.on(
       'message',
       (data: MessageData, callback: AckCallback) => {
@@ -444,6 +442,13 @@ class Peer extends Base {
     },
 
     [Actions.Record]: async (args, callback) => {
+      callback({
+        status: 'success',
+      });
+    },
+
+    [Actions.LeaveRoom]: async (args, callback) => {
+      this.close();
       callback({
         status: 'success',
       });

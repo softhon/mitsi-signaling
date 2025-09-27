@@ -175,13 +175,11 @@ class Room extends EventEmitter {
     return Array.from(this.peers.values());
   }
 
-  removePeer(peerId: string): void {
+  async removePeer(peerId: string): Promise<void> {
     const peer = this.peers.get(peerId);
     if (!peer) return;
     this.peers.delete(peerId);
-    this.updatePeerInDB(peer, { online: false }).catch(error =>
-      console.log(error)
-    );
+    await this.updatePeerInDB(peer, { online: false });
     if (this.isEmpty()) this.selfDestructCountDown();
   }
 
@@ -307,7 +305,7 @@ class Room extends EventEmitter {
   private handlePeerEvents(peer: Peer): void {
     peer.on(Actions.Close, ({ silent }) => {
       console.log('Close Peer:', { silent });
-      this.removePeer(peer.id);
+      this.removePeer(peer.id).catch(err => console.log(err));
       if (!silent)
         peer.sendMessage({
           message: {
