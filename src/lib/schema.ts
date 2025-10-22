@@ -36,7 +36,7 @@ const roomIdPeerIdSchema = z.object({
   peerId: z.string(),
 });
 
-const producerSource = z.enum(['mic', 'camera', 'screen']);
+const producerSource = z.enum(['mic', 'camera', 'screen', 'screenAudio']);
 const mediaKind = z.enum(['audio', 'video']);
 
 export const ValidationSchema = {
@@ -115,11 +115,11 @@ export const ValidationSchema = {
 
   producer: z.object({
     producerId: z.string(),
-    source: z.enum(['mic', 'camera', 'screen']),
+    source: producerSource,
   }),
 
   consumer: z.object({
     consumerId: z.string(),
-    source: z.enum(['mic', 'camera', 'screen']),
+    source: producerSource,
   }),
 };

@@ -242,7 +242,7 @@ class MediaNode extends EventEmitter {
   private async establishConnection(): Promise<void> {
     // Create gRPC client with proper options
     this.grpcClient = new protoDescriptor.mediaSignalingPackage.MediaSignaling(
-      `${this.ip}:${this.grpcPort}`,
+      `${this.address}:${this.grpcPort}`,
       grpc.credentials.createInsecure()
       // {
       //   'grpc.keepalive_time_ms': 10000,
