@@ -52,7 +52,7 @@
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "helmet": "^8.1.0",
-    "mediasoup": "^3.18.0",
+    "mediasoup": "3.19.4",
     "public-ip": "^7.0.1",
     "redis": "^4.7.0",
     "socket.io": "^4.8.1",
