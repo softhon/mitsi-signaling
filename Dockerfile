@@ -24,7 +24,7 @@ COPY . .
 
 RUN npm run build 
 
-COPY ./src/certs ./dist/certs
+# COPY ./src/certs ./dist/certs
 COPY ./src/protos ./dist/protos
 
 

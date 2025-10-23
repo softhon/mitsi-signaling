@@ -32,7 +32,6 @@ class MediaNode extends EventEmitter {
   id: string;
   private ip: string;
   private grpcPort: string | number;
-  private address: string;
   private grpcClient: MediaSignalingClient | null;
   private grpcCall: grpc.ClientDuplexStream<
     MessageRequest,
@@ -58,18 +57,15 @@ class MediaNode extends EventEmitter {
   constructor({
     id,
     ip = '0.0.0.0',
-    address,
     grpcPort = 50052,
   }: {
     id: string;
     ip: string;
-    address: string;
     grpcPort?: string | number;
   }) {
     super();
     this.id = id;
     this.ip = ip;
-    this.address = address;
     this.grpcPort = grpcPort;
     this.grpcClient = null;
     this.grpcCall = null;
@@ -85,21 +81,10 @@ class MediaNode extends EventEmitter {
 
     this.clientId = config.nodeId;
     this.connectionId = this.generateConnectionId();
+  }
 
-    // Handle existing connection with same ID
-    if (MediaNode.mediaNodes.has(this.id)) {
-      console.warn(
-        `MediaNode with ID ${this.id} already exists, disconnecting old instance`
-      );
-      // todo -> get and  disconnect old node
-    }
-
-    MediaNode.mediaNodes.set(this.id, this);
-
-    // Start connection process
-    this.connect().catch(error => {
-      console.error(`Initial connection failed for node ${this.id}:`, error);
-    });
+  getRouterRtpCapabilities(): mediasoupTypes.RtpCapabilities | null {
+    return this.routerRtpCapabilities;
   }
 
   private generateConnectionId(): string {
@@ -115,7 +100,12 @@ class MediaNode extends EventEmitter {
     }
     const connectionPromises = redisData.map(async data => {
       const mediaNodesData: MediaNodeData = JSON.parse(data);
-      new MediaNode(mediaNodesData);
+      new MediaNode(mediaNodesData).connect().catch(error => {
+        console.error(
+          `Failed to connect to MediaNode ${mediaNodesData.id}:`,
+          error
+        );
+      });
     });
 
     const results = await Promise.allSettled(connectionPromises);
@@ -136,8 +126,66 @@ class MediaNode extends EventEmitter {
     return nodes;
   }
 
-  getRouterRtpCapabilities(): mediasoupTypes.RtpCapabilities | null {
-    return this.routerRtpCapabilities;
+  async connect(): Promise<void> {
+    // this.cleanup(); // Clean up any existing connections
+    // check if instance already exists
+    let isExistingNode = false;
+    if (MediaNode.mediaNodes.has(this.id)) {
+      console.log(
+        `MediaNode connection instance with id ${this.id} already exists. close old connection .`
+      );
+      isExistingNode = true;
+
+      await MediaNode.mediaNodes.get(this.id)?.disconnect();
+    }
+
+    // Set connection timeout
+    const connectionPromise = this.establishConnection();
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      this.connectionTimeout = setTimeout(() => {
+        reject(new Error(`Connection timeout after 15 seconds`));
+      }, 15000);
+    });
+
+    await Promise.race([connectionPromise, timeoutPromise]);
+
+    // Clear connection timeout on success
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+
+    // store instance
+    MediaNode.mediaNodes.set(this.id, this);
+
+    // Send initial connection message
+    this.sendMessage(Actions.Connected, {
+      status: 'success',
+      nodeId: this.clientId,
+      connectionId: this.connectionId,
+      timestamp: Date.now(),
+      message: 'Successfully connected to Media Signaling Server',
+    });
+
+    console.log(
+      `Successfully ${isExistingNode ? 'reconnected' : 'connected'} to MediaNode ${this.id} at ${this.ip}:${this.grpcPort}`
+    );
+  }
+
+  async disconnect(): Promise<void> {
+    this.cleanup();
+    MediaNode.mediaNodes.delete(this.id);
+    console.log(`Disconnected from MediaNode ${this.id}`);
+  }
+
+  static async disconnectById(id: string): Promise<void> {
+    const node = MediaNode.mediaNodes.get(id);
+    if (node) {
+      await node.disconnect();
+      console.log(`Disconnected from MediaNode ${id}`);
+    } else {
+      console.warn(`No MediaNode found with id ${id} to disconnect`);
+    }
   }
 
   // Todo
@@ -150,33 +198,29 @@ class MediaNode extends EventEmitter {
   }
 
   private cleanup(): void {
-    console.log(`Cleaning up MediaNode ${this.id} connections and timers`);
+    try {
+      console.log(`Cleaning up MediaNode ${this.id} connections and timers`);
 
-    // Clear all timers
-    this.clearTimers();
+      // Clear all timers
+      this.clearTimers();
 
-    // Close gRPC call
-    if (this.grpcCall) {
-      try {
-        this.grpcCall.removeAllListeners();
-        this.grpcCall.cancel();
+      this.pendingRequests.forEach(({ reject }) => {
+        reject(new Error('MediaNode disconnected, request cancelled'));
+      });
+      this.pendingRequests.clear();
+
+      // Close gRPC call
+      if (this.grpcCall) {
+        this.grpcCall.end();
         this.grpcCall = null;
-      } catch (error) {
-        console.warn(
-          `⚠️  Error cancelling gRPC call for node ${this.id}:`,
-          error
-        );
       }
-    }
 
-    // Close gRPC client
-    if (this.grpcClient) {
-      try {
+      if (this.grpcClient) {
         this.grpcClient.close();
         this.grpcClient = null;
-      } catch (error) {
-        console.warn(`Error closing gRPC client for node ${this.id}:`, error);
       }
+    } catch (error) {
+      console.error(`Error during cleanup of MediaNode ${this.id}:`, error);
     }
   }
 
@@ -201,48 +245,10 @@ class MediaNode extends EventEmitter {
     this.circuitBreakerTimer = null;
   }
 
-  async connect(): Promise<void> {
-    this.cleanup(); // Clean up any existing connections
-
-    // Set connection timeout
-    const connectionPromise = this.establishConnection();
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      this.connectionTimeout = setTimeout(() => {
-        reject(new Error(`Connection timeout after 15 seconds`));
-      }, 15000);
-    });
-
-    await Promise.race([connectionPromise, timeoutPromise]);
-
-    // Clear connection timeout on success
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
-
-    // Send initial connection message
-    this.sendMessage(Actions.Connected, {
-      status: 'success',
-      nodeId: this.clientId,
-      connectionId: this.connectionId,
-      timestamp: Date.now(),
-      message: 'Successfully connected to Media Signaling Server',
-    });
-
-    // await this.sendMessageForResponse(Actions.Ping, {
-    //   timestamp: Date.now(),
-    //   connectionId: this.connectionId,
-    // });
-
-    console.log(
-      `Successfully connected to MediaNode ${this.id} at ${this.ip}:${this.grpcPort}`
-    );
-  }
-
   private async establishConnection(): Promise<void> {
     // Create gRPC client with proper options
     this.grpcClient = new protoDescriptor.mediaSignalingPackage.MediaSignaling(
-      `${this.address}:${this.grpcPort}`,
+      `${this.ip}:${this.grpcPort}`,
       grpc.credentials.createInsecure()
       // {
       //   'grpc.keepalive_time_ms': 10000,
