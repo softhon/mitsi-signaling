@@ -28,12 +28,10 @@ COPY ./src/certs ./dist/certs
 COPY ./src/protos ./dist/protos
 
 
-ENV REDIS_SERVER_URL=redis://host.docker.internal:6379
+# ENV REDIS_SERVER_URL=redis://host.docker.internal:6379
 
 # Application port
 EXPOSE 8000
-# GRPC default port
-# EXPOSE 50052
 
 
 CMD ["npm", "start"]
