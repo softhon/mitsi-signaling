@@ -122,4 +122,13 @@ export const ValidationSchema = {
     consumerId: z.string(),
     source: producerSource,
   }),
+
+  mediaNodeAdded: z.object({
+    id: z.string(),
+    ip: z.string(),
+    grpcPort: z.union([z.string(), z.number()]),
+  }),
+  mediaNodeRemoved: z.object({
+    id: z.string(),
+  }),
 };
