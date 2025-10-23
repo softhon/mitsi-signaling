@@ -2,6 +2,8 @@ import { createClient, RedisClientType, SetOptions } from 'redis';
 
 import { Actions as PSA } from '../types/actions';
 import config from '../config';
+import MediaNode from '../services/medianode';
+import { ValidationSchema } from '../lib/schema';
 
 class RedisServer {
   private static instance: RedisServer | null = null;
@@ -40,6 +42,8 @@ class RedisServer {
   async subscribe(channel: string): Promise<void> {
     if (!this.isConnected)
       throw new Error('Redis clients are not connected. Call connect() first');
+    console.log(`Subscribing to channel "${channel}"`);
+
     await this.subClient.subscribe(channel, message => {
       const {
         action,
@@ -48,6 +52,9 @@ class RedisServer {
         action: PSA;
         args: { [key: string]: unknown };
       } = JSON.parse(message);
+      console.log(
+        `got pubsub event from channel -> ${channel} message -> ${message}`
+      );
 
       const handler = this.pubSubHander[action];
 
@@ -130,6 +137,31 @@ class RedisServer {
   } = {
     [PSA.RemovePeer]: args => {
       console.log(args);
+    },
+    [PSA.MediaNodeAdded]: async args => {
+      // handle connection to medianode
+      try {
+        const data = ValidationSchema.mediaNodeAdded.parse(args);
+        await new MediaNode(data).connect();
+      } catch (error) {
+        console.error(
+          `Error connecting to MediaNode ${args['id']} at ${args['ip']}:${args['port']}`,
+          error
+        );
+      }
+    },
+    [PSA.MediaNodeRemoved]: async args => {
+      try {
+        const data = ValidationSchema.mediaNodeRemoved.parse(args);
+        MediaNode.disconnectById(data.id).catch(error => {
+          console.error(`Error disconnecting from MediaNode ${data.id}`, error);
+        });
+      } catch (error) {
+        console.error(
+          `Error parsing MediaNodeRemoved data for id ${args['id']}`,
+          error
+        );
+      }
     },
   };
 }
