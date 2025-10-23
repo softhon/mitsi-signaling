@@ -1,0 +1,28 @@
+services:
+  signaling:
+    build: .
+    container_name: mitsi-signaling
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_SERVER_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - mitsi-network
+  redis:
+    image: "redis:7-alpine"
+    container_name: mitsi-redis
+    ports:
+      - "6378:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - mitsi-network
+
+volumes:
+  redis-data:
+
+networks:
+  mitsi-network:
+    driver: bridge
