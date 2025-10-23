@@ -19,6 +19,7 @@ app.use(express.json());
 app.use('/', Routes);
 
 const httpsServer = createServer(config.httpsServerOptions, app);
+// const httpsServer = createServer(app);
 
 let signalnodeData: SignalnodeData;
 
