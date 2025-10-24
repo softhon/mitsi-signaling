@@ -27,7 +27,7 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
     const signalnodeData: SignalnodeData = {
       id: config.nodeId,
       ip,
-      address: `${config.port}`,
+      port: `${config.port}`,
     };
     await redisServer.sAdd(
       getRedisKey['signalnodes'](),

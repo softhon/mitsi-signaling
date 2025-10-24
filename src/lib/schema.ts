@@ -36,7 +36,7 @@ const roomIdPeerIdSchema = z.object({
   peerId: z.string(),
 });
 
-const producerSource = z.enum(['mic', 'camera', 'screen']);
+const producerSource = z.enum(['mic', 'camera', 'screen', 'screenAudio']);
 const mediaKind = z.enum(['audio', 'video']);
 
 export const ValidationSchema = {
@@ -84,6 +84,26 @@ export const ValidationSchema = {
     producerPaused: z.boolean(),
   }),
 
+  medianodeConnectionData: z.object({
+    status: z.enum(['success', 'failed']),
+    nodeId: z.string(),
+    connectionId: z.string(),
+    message: z.string(),
+    timestamp: z.number(),
+    // serverMetrics: z.any(),
+    routerRtpCapabilities: z
+      .any()
+      .refine(value => value, 'Can not be null or undefined'),
+    appData: z.any(),
+  }),
+
+  ConsumerStateData: roomIdPeerIdSchema.extend({
+    consumerId: z.string(),
+    producerPeerId: z.string(),
+    producerSource: producerSource,
+    fromProducer: z.boolean(),
+  }),
+
   createProducer: z.object({
     transportId: z.string(),
     kind: z.enum(['audio', 'video']),
@@ -95,23 +115,20 @@ export const ValidationSchema = {
 
   producer: z.object({
     producerId: z.string(),
-    source: z.enum(['mic', 'camera', 'screen']),
+    source: producerSource,
   }),
 
   consumer: z.object({
     consumerId: z.string(),
-    source: z.enum(['mic', 'camera', 'screen']),
+    source: producerSource,
   }),
-};
 
-export const MidialSignalingSchema = {
-  connected: z.object({
-    status: z.enum(['SUCCESS', 'FAILED']),
-    nodeId: z.string(),
-    connectionId: z.string(),
-    message: z.string(),
-    timestamp: z.number(),
-    serverMetrics: z.any(),
-    routerRtpCapabilities: z.any(),
+  mediaNodeAdded: z.object({
+    id: z.string(),
+    ip: z.string(),
+    grpcPort: z.union([z.string(), z.number()]),
+  }),
+  mediaNodeRemoved: z.object({
+    id: z.string(),
   }),
 };

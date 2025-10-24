@@ -117,7 +117,7 @@ export interface ChatData {
 export interface MediaNodeData {
   id: string;
   ip: string;
-  address: string;
+  address?: string;
   grpcPort: string | number;
 }
 
@@ -133,7 +133,7 @@ export interface Reaction {
 export interface SignalnodeData {
   id: string;
   ip: string;
-  address: string;
+  port: string;
 }
 
 export interface PendingRequest {

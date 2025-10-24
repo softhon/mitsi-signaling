@@ -1,4 +1,4 @@
-import { createServer } from 'https';
+import { createServer } from 'http';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -18,7 +18,8 @@ app.use(helmet());
 app.use(express.json());
 app.use('/', Routes);
 
-const httpsServer = createServer(config.httpsServerOptions, app);
+// const httpsServer = createServer(config.httpsServerOptions, app);
+const httpsServer = createServer(app);
 
 let signalnodeData: SignalnodeData;
 

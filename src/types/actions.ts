@@ -3,6 +3,7 @@ export enum Actions {
   Connected = 'connected',
   Disconnect = 'disconnect',
   JoinRoom = 'join_room',
+  LeaveRoom = 'leave_room',
   JoinVisitors = 'join_visitors',
   JoinWaiters = 'join_waiters',
   GetRoomData = 'get_room_data',
@@ -44,6 +45,7 @@ export enum Actions {
   AdmitWaiters = 'admit_waiters',
   DeclineWaiters = 'decline_waiters',
   Record = 'Record',
+  Reconnecting = 'Reconnecting',
 
   RemovePeer = 'remove_peer',
   AddRole = 'add_role',
@@ -65,4 +67,8 @@ export enum Actions {
   ConnectionError = 'connection_error',
 
   Close = 'close',
+
+  // MediaNode actions
+  MediaNodeAdded = 'medianode_added',
+  MediaNodeRemoved = 'medianode_removed',
 }

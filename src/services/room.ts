@@ -120,7 +120,7 @@ class Room extends EventEmitter {
           coHostEmails: roomData.coHostEmails,
           started: Date.now(),
           maxPeers: 50,
-          maxDuration: 180, // minutes
+          maxDuration: 60, // minutes
           allowRecording: false,
           allowWaiting: false,
           recording: false,
@@ -154,14 +154,13 @@ class Room extends EventEmitter {
       if (this.selfDestructTimeout) clearTimeout(this.selfDestructTimeout);
       this.handlePeerEvents(peer);
       const peerData = peer.getData();
-      peer.message({
+      peer.sendMessage({
         message: {
           action: Actions.PeerAdded,
           args: { ...peerData },
         },
         broadcast: true,
       });
-      console.log('Sent message');
       await this.savePeer(peer);
     } catch (error) {
       console.log(error);
@@ -176,13 +175,11 @@ class Room extends EventEmitter {
     return Array.from(this.peers.values());
   }
 
-  removePeer(peerId: string): void {
+  async removePeer(peerId: string): Promise<void> {
     const peer = this.peers.get(peerId);
     if (!peer) return;
     this.peers.delete(peerId);
-    this.updatePeerInDB(peer, { online: false }).catch(error =>
-      console.log(error)
-    );
+    await this.updatePeerInDB(peer, { online: false });
     if (this.isEmpty()) this.selfDestructCountDown();
   }
 
@@ -275,6 +272,7 @@ class Room extends EventEmitter {
   }
 
   private handleCountDown(): void {
+    console.log(this.timeLeft);
     if (this.endCountDownInterval) clearInterval(this.endCountDownInterval);
     this.endCountDownInterval = setInterval(() => {
       this.timeLeft -= 1;
@@ -287,12 +285,17 @@ class Room extends EventEmitter {
 
   private async selfDestructCountDown(): Promise<void> {
     try {
-      if (this.closed || !this.isEmpty()) return;
+      if (this.closed || !this.isEmpty())
+        return console.log('Room self destruct did not continue');
+
+      console.log('Room self destruct called ');
+
       if (this.selfDestructTimeout) clearTimeout(this.selfDestructTimeout);
 
       this.selfDestructTimeout = setTimeout(async () => {
         const peersOnline = await this.getPeersOnline();
         this.close(peersOnline.length === 0);
+        console.log('Room self destruct closed room');
       }, ROOM_TIMEOUT);
     } catch (error) {
       console.error('selfDestructCountDown Failed', error);
@@ -302,9 +305,9 @@ class Room extends EventEmitter {
   private handlePeerEvents(peer: Peer): void {
     peer.on(Actions.Close, ({ silent }) => {
       console.log('Close Peer:', { silent });
-      this.removePeer(peer.id);
+      this.removePeer(peer.id).catch(err => console.log(err));
       if (!silent)
-        peer.message({
+        peer.sendMessage({
           message: {
             action: Actions.PeerLeft,
             args: {
