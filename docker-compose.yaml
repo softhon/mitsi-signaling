@@ -10,6 +10,39 @@ services:
       - redis
     networks:
       - mitsi-network
+    restart: unless-stopped
+  media:
+    build: ../mitsi-media
+    container_name: mitsi-media
+    ports:
+      - "4000:4000"
+      - "2000-2100:2000-2100/udp"
+      - "50052:50052"
+    environment:
+      - REDIS_SERVER_URL=redis://redis:6379
+      - RTC_MIN_PORT=2000
+      - RTC_MAX_PORT=2100
+      - SERVER_ADDRESS=media
+      - ANNOUNCED_ADDRESS=192.168.0.187
+    depends_on:
+      - signaling
+      - redis
+    networks:
+      - mitsi-network
+    restart: unless-stopped
+  web:
+    build:
+      context: ../mitsi-web
+      args:
+        - SIGNALING_SERVER=http://localhost:8000
+    container_name: mitsi-web
+    ports:
+      - "80:80"
+    depends_on:
+      - signaling
+    networks:
+      - mitsi-network
+    restart: unless-stopped
   redis:
     image: "redis:7-alpine"
     container_name: mitsi-redis
@@ -19,6 +52,7 @@ services:
       - redis-data:/data
     networks:
       - mitsi-network
+    restart: unless-stopped
 
 volumes:
   redis-data:
