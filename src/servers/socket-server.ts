@@ -13,7 +13,7 @@ export class SocketServer {
   private constructor(httpServer: HttpServer) {
     this.io = new Server(httpServer, {
       cors: config.cors,
-      adapter: createAdapter(redisServer.getPubClient()),
+      // adapter: createAdapter(redisServer.getPubClient()),
     });
     this.setupConnectionHandlers();
   }
