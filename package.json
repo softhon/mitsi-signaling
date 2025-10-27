@@ -54,7 +54,7 @@
     "helmet": "^8.1.0",
     "mediasoup": "3.19.4",
     "public-ip": "^7.0.1",
-    "redis": "^4.7.0",
+    "redis": "^5.8.0",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "zod": "^4.0.15"

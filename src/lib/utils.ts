@@ -22,17 +22,17 @@ export const getPubSubChannel = {
 
 export const registerSignalNode = async (): Promise<SignalnodeData> => {
   try {
-    const { publicIpv4 } = await import('public-ip');
-    const ip = await publicIpv4();
+    console.log('start registerSignalNode ');
+
+    // const { publicIpv4 } =  import('public-ip');
+    // const ip = await publicIpv4();
     const signalnodeData: SignalnodeData = {
       id: config.nodeId,
-      ip,
+      ip: '',
       port: `${config.port}`,
     };
-    await redisServer.sAdd(
-      getRedisKey['signalnodes'](),
-      JSON.stringify(signalnodeData)
-    );
+    await redisServer.sAdd(getRedisKey['signalnodes'](), 'sing');
+    console.log('finish registerSignalNode ');
     return signalnodeData;
   } catch (error) {
     throw error;
