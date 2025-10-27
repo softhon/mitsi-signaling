@@ -100,6 +100,7 @@ class RedisServer {
   }
 
   async sAdd(key: string, member: string): Promise<number> {
+    console.log('called add signal node');
     return await this.pubClient.sAdd(key, member);
   }
 

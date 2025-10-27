@@ -19,24 +19,26 @@ app.use(express.json());
 app.use('/', Routes);
 
 // const httpsServer = createServer(config.httpsServerOptions, app);
-const httpsServer = createServer(app);
+const httpServer = createServer(app);
 
 let signalnodeData: SignalnodeData;
 
 (async (): Promise<void> => {
   try {
     await redisServer.connect();
-    SocketServer.getInstance(httpsServer);
 
-    httpsServer.listen(config.port, () => {
+    SocketServer.getInstance(httpServer);
+
+    httpServer.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });
 
     // register signalnode
     signalnodeData = await registerSignalNode();
+
     console.log('Register signalnode');
 
-    MediaNode.connectToRunningNodes();
+    // MediaNode.connectToRunningNodes();
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);
@@ -55,7 +57,7 @@ const shutdown = async (): Promise<void> => {
     console.log('Delete signalnode');
     await SocketServer.getInstance().close();
     await redisServer.disconnect();
-    httpsServer.close();
+    httpServer.close();
     console.log('Application shut down gracefully');
     process.exit(0);
   } catch (err) {

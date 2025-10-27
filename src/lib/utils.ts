@@ -31,7 +31,7 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
       ip: '',
       port: `${config.port}`,
     };
-    await redisServer.sAdd(getRedisKey['signalnodes'](), 'sing');
+    await redisServer.hSet(getRedisKey['signalnodes'](), { ...signalnodeData });
     console.log('finish registerSignalNode ');
     return signalnodeData;
   } catch (error) {
