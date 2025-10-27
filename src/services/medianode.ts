@@ -91,7 +91,30 @@ class MediaNode extends EventEmitter {
     return `${this.clientId}_${this.id}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   }
 
+  static async getRunningMediaNodes(): Promise<
+    { [key: string]: string | number }[]
+  > {
+    console.log('getRunningMediaNodes');
+    let cursor: string = '0';
+    const medianodeKeys: string[] = [];
+
+    do {
+      const scanResult = await redisServer.scan(cursor, {
+        MATCH: `medianode:*`,
+        COUNT: 10,
+      });
+      medianodeKeys.push(...scanResult.keys);
+      cursor = scanResult.cursor;
+    } while (cursor !== '0');
+
+    const hashPromise = medianodeKeys.map(key => redisServer.hGetAll(key));
+    const mediaNodesData = await Promise.all(hashPromise);
+    console.log(mediaNodesData);
+    return mediaNodesData;
+  }
+
   static async connectToRunningNodes(): Promise<MediaNode[]> {
+    MediaNode.getRunningMediaNodes();
     const redisData = await redisServer.sMembers(getRedisKey['medianodes']());
 
     if (!redisData.length) {
