@@ -4,12 +4,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 
 import config from './config';
-import { redisServer } from './servers/redis-server';
+// import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
-import MediaNode from './services/medianode';
 import { SignalnodeData } from './types';
 import { getRedisKey, registerSignalNode } from './lib/utils';
+import { ioRedisServer } from './servers/ioredis-server';
 // import { publicIpv4 } from 'public-ip';
 
 const app = express();
@@ -25,7 +25,9 @@ let signalnodeData: SignalnodeData;
 
 (async (): Promise<void> => {
   try {
-    await redisServer.connect();
+    // await redisServer.connect();
+
+    await ioRedisServer.connect();
 
     SocketServer.getInstance(httpServer);
 
@@ -50,13 +52,10 @@ let signalnodeData: SignalnodeData;
 const shutdown = async (): Promise<void> => {
   try {
     // remove signal node
-    await redisServer.sRem(
-      getRedisKey['signalnodes'](),
-      JSON.stringify(signalnodeData)
-    );
+    await ioRedisServer.del(getRedisKey['signalnodes']());
     console.log('Delete signalnode');
     await SocketServer.getInstance().close();
-    await redisServer.disconnect();
+    await ioRedisServer.disconnect();
     httpServer.close();
     console.log('Application shut down gracefully');
     process.exit(0);

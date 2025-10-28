@@ -1,5 +1,6 @@
 import config from '../config';
-import { redisServer } from '../servers/redis-server';
+import { ioRedisServer } from '../servers/ioredis-server';
+// import { redisServer } from '../servers/redis-server';
 import { SignalnodeData } from '../types';
 
 export const getRedisKey = {
@@ -31,7 +32,9 @@ export const registerSignalNode = async (): Promise<SignalnodeData> => {
       ip: '',
       port: `${config.port}`,
     };
-    await redisServer.hSet(getRedisKey['signalnodes'](), { ...signalnodeData });
+    await ioRedisServer.hSet(getRedisKey['signalnodes'](), {
+      ...signalnodeData,
+    });
     console.log('finish registerSignalNode ');
     return signalnodeData;
   } catch (error) {
