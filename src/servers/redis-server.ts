@@ -100,7 +100,6 @@ class RedisServer {
   }
 
   async sAdd(key: string, member: string): Promise<number> {
-    console.log('called add signal node');
     return await this.pubClient.sAdd(key, member);
   }
 
@@ -249,4 +248,5 @@ class RedisServer {
   };
 }
 
-export const redisServer = RedisServer.getInstance();
+export default RedisServer;
+// export const redisServer = RedisServer.getInstance();

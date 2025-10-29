@@ -7,7 +7,7 @@ import config from './config';
 // import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
-import { SignalnodeData } from './types';
+// import { SignalnodeData } from './types';
 import { getRedisKey, registerSignalNode } from './lib/utils';
 import { ioRedisServer } from './servers/ioredis-server';
 // import { publicIpv4 } from 'public-ip';
@@ -21,7 +21,7 @@ app.use('/', Routes);
 // const httpsServer = createServer(config.httpsServerOptions, app);
 const httpServer = createServer(app);
 
-let signalnodeData: SignalnodeData;
+// let signalnodeData: SignalnodeData;
 
 (async (): Promise<void> => {
   try {
@@ -36,7 +36,7 @@ let signalnodeData: SignalnodeData;
     });
 
     // register signalnode
-    signalnodeData = await registerSignalNode();
+    await registerSignalNode();
 
     console.log('Register signalnode');
 

@@ -9,19 +9,10 @@ class IORedisServer {
   private static instance: IORedisServer | null = null;
   private pubClient: Redis;
   private subClient: Redis;
+
   private isConnected: boolean = false;
 
   private constructor() {
-    // const redisOptions: RedisOptions = {
-    //   host: new URL(config.redisServerUrl).hostname || 'localhost',
-    //   port: parseInt(new URL(config.redisServerUrl).port || '6379'),
-    //   password: new URL(config.redisServerUrl).password,
-    //   retryStrategy: (times) => {
-    //     const delay = Math.min(times * 50, 2000);
-    //     return delay;
-    //   },
-    // };
-
     this.pubClient = new Redis();
     this.subClient = this.pubClient.duplicate();
   }
@@ -47,6 +38,31 @@ class IORedisServer {
       console.error(error);
       throw error;
     }
+  }
+
+  async publish({
+    channel,
+    action,
+    args,
+  }: {
+    channel: string;
+    action: PSA;
+    args: { [key: string]: unknown };
+  }): Promise<void> {
+    if (!this.isConnected)
+      throw new Error('Redis clients are not connected. Call connect() first');
+
+    const message = JSON.stringify({ action, args });
+    await this.pubClient.publish(channel, message);
+    console.info(`Message published to channel ${message}`);
+  }
+
+  getPubClient(): Redis {
+    return this.pubClient;
+  }
+
+  getSubClient(): Redis {
+    return this.subClient;
   }
 
   async subscribe(channel: string): Promise<void> {
@@ -82,41 +98,33 @@ class IORedisServer {
     console.log(`Subscribed to channel "${channel}"`);
   }
 
-  async publish({
-    channel,
-    action,
-    args,
-  }: {
-    channel: string;
-    action: PSA;
-    args: { [key: string]: unknown };
-  }): Promise<void> {
+  async unsubscribe(channel: string): Promise<void> {
     if (!this.isConnected)
       throw new Error('Redis clients are not connected. Call connect() first');
 
-    const message = JSON.stringify({ action, args });
-    await this.pubClient.publish(channel, message);
-    console.info(`Message published to channel ${message}`);
+    await this.subClient.unsubscribe(channel);
+    console.log(`Unsubscribed from channel "${channel}"`);
   }
 
-  getPubClient(): Redis {
-    return this.pubClient;
+  // Set operations
+
+  async set(key: string, value: string | number): Promise<string> {
+    return await this.pubClient.set(key, value);
   }
 
-  getSubClient(): Redis {
-    return this.subClient;
+  async setex(key: string, value: string, seconds: number): Promise<string> {
+    return await this.pubClient.setex(key, value, seconds);
+  }
+
+  async setnx(key: string, value: string): Promise<number> {
+    return await this.pubClient.setnx(key, value);
   }
 
   async get(key: string): Promise<string | null> {
     return await this.pubClient.get(key);
   }
 
-  async set(key: string, value: string): Promise<string | null> {
-    return await this.pubClient.set(key, value);
-  }
-
   async sAdd(key: string, member: string): Promise<number> {
-    console.log('called add signal node');
     return await this.pubClient.sadd(key, member);
   }
 
@@ -162,6 +170,8 @@ class IORedisServer {
   async exists(key: string): Promise<number> {
     return await this.pubClient.exists(key);
   }
+
+  // Hash operations
 
   async hSet(
     key: string,
@@ -237,14 +247,6 @@ class IORedisServer {
       this.isConnected = false;
       console.log('Redis clients disconnected');
     }
-  }
-
-  async unsubscribe(channel: string): Promise<void> {
-    if (!this.isConnected)
-      throw new Error('Redis clients are not connected. Call connect() first');
-
-    await this.subClient.unsubscribe(channel);
-    console.log(`Unsubscribed from channel "${channel}"`);
   }
 
   private pubSubHander: {

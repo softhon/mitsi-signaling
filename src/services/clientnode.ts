@@ -12,7 +12,7 @@ import {
 import Lobby from './lobby';
 import Visitor from './visitor';
 import Room from './room';
-import { redisServer } from '../servers/redis-server';
+import { ioRedisServer } from '../servers/ioredis-server';
 import { getPubSubChannel, getRedisKey } from '../lib/utils';
 import Waiter from './waiter';
 import { ValidationSchema } from '../lib/schema';
@@ -116,7 +116,9 @@ class ClientNode extends EventEmitter {
       if (!room) {
         // room could be running in another instance
         // find room in redis
-        const roomInstance = await redisServer.get(getRedisKey['room'](roomId));
+        const roomInstance = await ioRedisServer.get(
+          getRedisKey['room'](roomId)
+        );
 
         if (roomInstance) {
           room = await Room.create(roomId);
@@ -132,7 +134,7 @@ class ClientNode extends EventEmitter {
         });
 
       // check if visitor was a participant
-      const wasAParticipant = await redisServer.sIsMember(
+      const wasAParticipant = await ioRedisServer.sIsMember(
         getRedisKey['roomPeerIds'](roomId),
         peerId
       );
@@ -152,7 +154,7 @@ class ClientNode extends EventEmitter {
       const data = ValidationSchema.roomIdPeerIdPeerData.parse(args);
       const { roomId, peerId, peerData } = data;
 
-      const wasAParticipant = await redisServer.sIsMember(
+      const wasAParticipant = await ioRedisServer.sIsMember(
         getRedisKey['roomPeerIds'](roomId),
         peerId
       );
@@ -190,7 +192,7 @@ class ClientNode extends EventEmitter {
           },
         });
       }
-      const redisData = await redisServer.get(getRedisKey['room'](roomId));
+      const redisData = await ioRedisServer.get(getRedisKey['room'](roomId));
 
       if (redisData) {
         const roomData: RoomInstanceData = JSON.parse(redisData);
@@ -231,7 +233,7 @@ class ClientNode extends EventEmitter {
           peer => peer.id === peerData.id
         );
         if (peerExistingElseWhere) {
-          await redisServer.publish({
+          await ioRedisServer.publish({
             channel: getPubSubChannel['room'](roomId),
             action: Actions.RemovePeer,
             args: {
