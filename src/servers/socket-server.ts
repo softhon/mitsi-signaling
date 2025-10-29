@@ -1,10 +1,8 @@
 import { Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-streams-adapter';
-// import { createShardedAdapter } from '@socket.io/redis-adapter';
 
 import config from '../config';
-// import { redisServer } from './redis-server';
 import ClientNode from '../services/clientnode';
 import { ioRedisServer } from './ioredis-server';
 
@@ -16,10 +14,6 @@ export class SocketServer {
     this.io = new Server(httpServer, {
       cors: config.cors,
       adapter: createAdapter(ioRedisServer.getPubClient()),
-      // adapter: createShardedAdapter(
-      //   redisServer.getPubClient(),
-      //   redisServer.getSubClient()
-      // ),
     });
     this.setupConnectionHandlers();
   }

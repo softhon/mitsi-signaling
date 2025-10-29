@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 
 import { Actions as PSA } from '../types/actions';
-// import config from '../config';
+import config from '../config';
 import MediaNode from '../services/medianode';
 import { ValidationSchema } from '../lib/schema';
 
@@ -13,7 +13,7 @@ class IORedisServer {
   private isConnected: boolean = false;
 
   private constructor() {
-    this.pubClient = new Redis();
+    this.pubClient = new Redis(config.redisServerUrl);
     this.subClient = this.pubClient.duplicate();
   }
 
