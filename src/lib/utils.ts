@@ -1,5 +1,6 @@
 import config from '../config';
-import { redisServer } from '../servers/redis-server';
+import { ioRedisServer } from '../servers/ioredis-server';
+// import { redisServer } from '../servers/redis-server';
 import { SignalnodeData } from '../types';
 
 export const getRedisKey = {
@@ -22,17 +23,19 @@ export const getPubSubChannel = {
 
 export const registerSignalNode = async (): Promise<SignalnodeData> => {
   try {
-    const { publicIpv4 } = await import('public-ip');
-    const ip = await publicIpv4();
+    console.log('start registerSignalNode ');
+
+    // const { publicIpv4 } =  import('public-ip');
+    // const ip = await publicIpv4();
     const signalnodeData: SignalnodeData = {
       id: config.nodeId,
-      ip,
+      ip: '',
       port: `${config.port}`,
     };
-    await redisServer.sAdd(
-      getRedisKey['signalnodes'](),
-      JSON.stringify(signalnodeData)
-    );
+    await ioRedisServer.hSet(getRedisKey['signalnodes'](), {
+      ...signalnodeData,
+    });
+    console.log('finish registerSignalNode ');
     return signalnodeData;
   } catch (error) {
     throw error;

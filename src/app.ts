@@ -4,12 +4,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 
 import config from './config';
-import { redisServer } from './servers/redis-server';
+// import { redisServer } from './servers/redis-server';
 import { SocketServer } from './servers/socket-server';
 import { Routes } from './routes';
-import MediaNode from './services/medianode';
-import { SignalnodeData } from './types';
+// import { SignalnodeData } from './types';
 import { getRedisKey, registerSignalNode } from './lib/utils';
+import { ioRedisServer } from './servers/ioredis-server';
 // import { publicIpv4 } from 'public-ip';
 
 const app = express();
@@ -19,24 +19,28 @@ app.use(express.json());
 app.use('/', Routes);
 
 // const httpsServer = createServer(config.httpsServerOptions, app);
-const httpsServer = createServer(app);
+const httpServer = createServer(app);
 
-let signalnodeData: SignalnodeData;
+// let signalnodeData: SignalnodeData;
 
 (async (): Promise<void> => {
   try {
-    await redisServer.connect();
-    SocketServer.getInstance(httpsServer);
+    // await redisServer.connect();
 
-    httpsServer.listen(config.port, () => {
+    await ioRedisServer.connect();
+
+    SocketServer.getInstance(httpServer);
+
+    httpServer.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });
 
     // register signalnode
-    signalnodeData = await registerSignalNode();
+    await registerSignalNode();
+
     console.log('Register signalnode');
 
-    MediaNode.connectToRunningNodes();
+    // MediaNode.connectToRunningNodes();
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);
@@ -48,14 +52,11 @@ let signalnodeData: SignalnodeData;
 const shutdown = async (): Promise<void> => {
   try {
     // remove signal node
-    await redisServer.sRem(
-      getRedisKey['signalnodes'](),
-      JSON.stringify(signalnodeData)
-    );
+    await ioRedisServer.del(getRedisKey['signalnodes']());
     console.log('Delete signalnode');
     await SocketServer.getInstance().close();
-    await redisServer.disconnect();
-    httpsServer.close();
+    await ioRedisServer.disconnect();
+    httpServer.close();
     console.log('Application shut down gracefully');
     process.exit(0);
   } catch (err) {

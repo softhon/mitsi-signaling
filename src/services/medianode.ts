@@ -4,7 +4,7 @@ import { types as mediasoupTypes } from 'mediasoup';
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 
-import { redisServer } from '../servers/redis-server';
+import { ioRedisServer } from '../servers/ioredis-server';
 import { getRedisKey, parseArguments as parseArguments } from '../lib/utils';
 import { MediaNodeData, PendingRequest, ResponseData } from '../types';
 import { ProtoGrpcType } from '../protos/gen/media-signaling';
@@ -91,8 +91,31 @@ class MediaNode extends EventEmitter {
     return `${this.clientId}_${this.id}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   }
 
+  static async getRunningMediaNodes(): Promise<
+    { [key: string]: string | number }[]
+  > {
+    console.log('getRunningMediaNodes');
+    let cursor: string = '0';
+    const medianodeKeys: string[] = [];
+
+    do {
+      const scanResult = await ioRedisServer.scan(cursor, {
+        MATCH: `medianode:*`,
+        COUNT: 10,
+      });
+      medianodeKeys.push(...scanResult.keys);
+      cursor = scanResult.cursor;
+    } while (cursor !== '0');
+
+    const hashPromise = medianodeKeys.map(key => ioRedisServer.hGetAll(key));
+    const mediaNodesData = await Promise.all(hashPromise);
+    console.log(mediaNodesData);
+    return mediaNodesData;
+  }
+
   static async connectToRunningNodes(): Promise<MediaNode[]> {
-    const redisData = await redisServer.sMembers(getRedisKey['medianodes']());
+    MediaNode.getRunningMediaNodes();
+    const redisData = await ioRedisServer.sMembers(getRedisKey['medianodes']());
 
     if (!redisData.length) {
       console.log('No running media nodes found in Redis');

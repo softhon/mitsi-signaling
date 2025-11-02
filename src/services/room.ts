@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import Peer from './peer';
-import { redisServer } from '../servers/redis-server';
+import { ioRedisServer } from '../servers/ioredis-server';
 import { PeerData, RoomData, RoomInstanceData } from '../types';
 import { getPubSubChannel, getRedisKey } from '../lib/utils';
 import { Actions } from '../types/actions';
@@ -83,7 +83,7 @@ class Room extends EventEmitter {
     clearTimeout(this.endCountDownInterval);
 
     // unsubscribe from room pubsub
-    await redisServer.unsubscribe(getPubSubChannel['room'](this.roomId));
+    await ioRedisServer.unsubscribe(getPubSubChannel['room'](this.roomId));
 
     this.removeAllListeners();
   }
@@ -91,7 +91,7 @@ class Room extends EventEmitter {
   static async create(roomId: string): Promise<Room> {
     try {
       // get room from redis if ongoing
-      const activeRoom = await redisServer.get(getRedisKey['room'](roomId));
+      const activeRoom = await ioRedisServer.get(getRedisKey['room'](roomId));
 
       let roomInstanceData: RoomInstanceData;
 
@@ -127,14 +127,14 @@ class Room extends EventEmitter {
         };
       }
       const room = new Room(roomInstanceData);
-      await redisServer.set(
+      // set room if it doesn't exist
+      await ioRedisServer.setnx(
         getRedisKey['room'](roomId),
-        JSON.stringify(roomInstanceData),
-        { NX: true }
+        JSON.stringify(roomInstanceData)
       );
 
       // subcribe to room pubsubchannel
-      await redisServer.subscribe(getPubSubChannel['room'](roomId));
+      await ioRedisServer.subscribe(getPubSubChannel['room'](roomId));
 
       return room;
     } catch (error) {
@@ -184,7 +184,7 @@ class Room extends EventEmitter {
   }
 
   async getPeersFromDB(): Promise<PeerData[]> {
-    const members = await redisServer.sMembers(
+    const members = await ioRedisServer.sMembers(
       getRedisKey['roomPeers'](this.roomId)
     );
 
@@ -206,12 +206,12 @@ class Room extends EventEmitter {
     const peers = await this.getPeersFromDB();
     const peerData = peers.find(value => value.id === peer.id);
     if (!peerData) return;
-    await redisServer.sRem(
+    await ioRedisServer.sRem(
       getRedisKey['roomPeers'](this.roomId),
       JSON.stringify(peerData)
     );
 
-    await redisServer.sAdd(
+    await ioRedisServer.sAdd(
       getRedisKey['roomPeers'](this.roomId),
       JSON.stringify({
         ...peer.getData(),
@@ -221,7 +221,7 @@ class Room extends EventEmitter {
   }
 
   async savePeer(peer: Peer): Promise<void> {
-    const wasSaved = await redisServer.sIsMember(
+    const wasSaved = await ioRedisServer.sIsMember(
       getRedisKey['roomPeerIds'](this.roomId),
       peer.id
     );
@@ -230,27 +230,27 @@ class Room extends EventEmitter {
       const savedPeers = await this.getPeersFromDB();
       const foundPeerData = savedPeers.find(value => value.id === peer.id);
       if (foundPeerData) {
-        await redisServer.sRem(
+        await ioRedisServer.sRem(
           getRedisKey['roomPeers'](this.roomId),
           JSON.stringify(foundPeerData)
         );
       }
     }
 
-    await redisServer.sAdd(
+    await ioRedisServer.sAdd(
       getRedisKey['roomPeers'](this.roomId),
       JSON.stringify({
         ...peer.getData(),
         online: true,
       })
     );
-    await redisServer.sAdd(getRedisKey['roomPeerIds'](this.roomId), peer.id);
+    await ioRedisServer.sAdd(getRedisKey['roomPeerIds'](this.roomId), peer.id);
 
     console.log('Saved Peer');
   }
 
   async getActiveSpeakerPeerId(): Promise<string | null> {
-    const data = await redisServer.get(
+    const data = await ioRedisServer.get(
       getRedisKey['roomActiveSpeakerPeerId'](this.roomId)
     );
     return data;
@@ -261,7 +261,7 @@ class Room extends EventEmitter {
   }
 
   async getData(): Promise<RoomInstanceData | undefined> {
-    const data = await redisServer.get(getRedisKey['room'](this.roomId));
+    const data = await ioRedisServer.get(getRedisKey['room'](this.roomId));
     if (!data) return;
     const activeSpeakerPeerId = await this.getActiveSpeakerPeerId();
     return {

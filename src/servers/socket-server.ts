@@ -3,8 +3,8 @@ import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-streams-adapter';
 
 import config from '../config';
-import { redisServer } from './redis-server';
 import ClientNode from '../services/clientnode';
+import { ioRedisServer } from './ioredis-server';
 
 export class SocketServer {
   private static instance: SocketServer | null = null;
@@ -13,7 +13,7 @@ export class SocketServer {
   private constructor(httpServer: HttpServer) {
     this.io = new Server(httpServer, {
       cors: config.cors,
-      adapter: createAdapter(redisServer.getPubClient()),
+      adapter: createAdapter(ioRedisServer.getPubClient()),
     });
     this.setupConnectionHandlers();
   }

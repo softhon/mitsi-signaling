@@ -14,7 +14,7 @@ import { Actions } from '../types/actions';
 import MediaNode from './medianode';
 import { getPubSubChannel } from '../lib/utils';
 import { ValidationSchema } from '../lib/schema';
-import { redisServer } from '../servers/redis-server';
+import { ioRedisServer } from '../servers/ioredis-server';
 import Room from './room';
 
 class Peer extends Base {
@@ -295,7 +295,7 @@ class Peer extends Base {
       const data = ValidationSchema.peerIds.parse(args);
       const { peerIds } = data;
 
-      redisServer.publish({
+      ioRedisServer.publish({
         channel: getPubSubChannel['room'](roomId),
         action: Actions.Mute,
         args: {
@@ -329,7 +329,7 @@ class Peer extends Base {
       const data = ValidationSchema.peerIds.parse(args);
       const { peerIds } = data;
 
-      redisServer.publish({
+      ioRedisServer.publish({
         channel: getPubSubChannel['room'](roomId),
         action: Actions.OffCamera,
         args: {
@@ -363,7 +363,7 @@ class Peer extends Base {
       const data = ValidationSchema.peerIds.parse(args);
       const { peerIds } = data;
 
-      redisServer.publish({
+      ioRedisServer.publish({
         channel: getPubSubChannel['room'](roomId),
         action: Actions.StopScreen,
         args: {
@@ -413,7 +413,7 @@ class Peer extends Base {
       const data = ValidationSchema.peerIds.parse(args);
       const { peerIds } = data;
 
-      redisServer.publish({
+      ioRedisServer.publish({
         channel: getPubSubChannel['room'](roomId),
         action: Actions.LowerHands,
         args: {
