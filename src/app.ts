@@ -10,6 +10,7 @@ import { Routes } from './routes';
 // import { SignalnodeData } from './types';
 import { getRedisKey, registerSignalNode } from './lib/utils';
 import { ioRedisServer } from './servers/ioredis-server';
+import MediaNode from './services/medianode';
 // import { publicIpv4 } from 'public-ip';
 
 const app = express();
@@ -40,7 +41,7 @@ const httpServer = createServer(app);
 
     console.log('Register signalnode');
 
-    // MediaNode.connectToRunningNodes();
+    MediaNode.connectToRunningNodes();
   } catch (err) {
     console.error('Initialization error:', err);
     process.exit(1);

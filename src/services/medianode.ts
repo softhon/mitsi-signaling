@@ -5,8 +5,8 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 
 import { ioRedisServer } from '../servers/ioredis-server';
-import { getRedisKey, parseArguments as parseArguments } from '../lib/utils';
-import { MediaNodeData, PendingRequest, ResponseData } from '../types';
+import { parseArguments as parseArguments } from '../lib/utils';
+import { PendingRequest, ResponseData } from '../types';
 import { ProtoGrpcType } from '../protos/gen/media-signaling';
 import { MediaSignalingClient } from '../protos/gen/mediaSignalingPackage/MediaSignaling';
 import { MessageRequest } from '../protos/gen/mediaSignalingPackage/MessageRequest';
@@ -95,39 +95,37 @@ class MediaNode extends EventEmitter {
     { [key: string]: string | number }[]
   > {
     console.log('getRunningMediaNodes');
-    let cursor: string = '0';
+    let cursor = 0;
     const medianodeKeys: string[] = [];
 
     do {
       const scanResult = await ioRedisServer.scan(cursor, {
-        MATCH: `medianode:*`,
+        MATCH: `medianodes:*`,
         COUNT: 10,
       });
       medianodeKeys.push(...scanResult.keys);
-      cursor = scanResult.cursor;
-    } while (cursor !== '0');
+      cursor = parseInt(scanResult.cursor);
+    } while (cursor !== 0);
 
     const hashPromise = medianodeKeys.map(key => ioRedisServer.hGetAll(key));
     const mediaNodesData = await Promise.all(hashPromise);
-    console.log(mediaNodesData);
+    console.log({ mediaNodesData });
     return mediaNodesData;
   }
 
   static async connectToRunningNodes(): Promise<MediaNode[]> {
-    MediaNode.getRunningMediaNodes();
-    const redisData = await ioRedisServer.sMembers(getRedisKey['medianodes']());
+    const mediaNodeData = await MediaNode.getRunningMediaNodes();
+    // return;
 
-    if (!redisData.length) {
+    if (!mediaNodeData.length) {
       console.log('No running media nodes found in Redis');
       return [];
     }
-    const connectionPromises = redisData.map(async data => {
-      const mediaNodesData: MediaNodeData = JSON.parse(data);
-      new MediaNode(mediaNodesData).connect().catch(error => {
-        console.error(
-          `Failed to connect to MediaNode ${mediaNodesData.id}:`,
-          error
-        );
+    const connectionPromises = mediaNodeData.map(async medianode => {
+      const data = ValidationSchema.mediaNodeAdded.parse(medianode);
+
+      new MediaNode(data).connect().catch(error => {
+        console.error(`Failed to connect to MediaNode ${data.id}:`, error);
       });
     });
 
