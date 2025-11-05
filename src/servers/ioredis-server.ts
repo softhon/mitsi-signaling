@@ -215,6 +215,10 @@ class IORedisServer {
     return await this.pubClient.hlen(key);
   }
 
+  async hExists(key: string, field: string): Promise<number> {
+    return await this.pubClient.hexists(key, field);
+  }
+
   async del(key: string): Promise<number> {
     return await this.pubClient.del(key);
   }
