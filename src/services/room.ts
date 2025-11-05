@@ -184,7 +184,7 @@ class Room extends EventEmitter {
   }
 
   async getPeersFromDB(): Promise<PeerData[]> {
-    const members = await ioRedisServer.sMembers(
+    const members = await ioRedisServer.hVals(
       getRedisKey['roomPeers'](this.roomId)
     );
 
@@ -201,18 +201,26 @@ class Room extends EventEmitter {
     const peers = await this.getPeersFromDB();
     return peers.filter(peer => peer.online);
   }
-
-  async updatePeerInDB(peer: Peer, value?: Partial<PeerData>): Promise<void> {
-    const peers = await this.getPeersFromDB();
-    const peerData = peers.find(value => value.id === peer.id);
-    if (!peerData) return;
-    await ioRedisServer.sRem(
+  async getPeerByIdFromDB(peerId: string): Promise<PeerData | null> {
+    const data = await ioRedisServer.hGet(
       getRedisKey['roomPeers'](this.roomId),
-      JSON.stringify(peerData)
+      peerId
     );
 
-    await ioRedisServer.sAdd(
+    if (!data) return null;
+
+    return JSON.parse(data);
+  }
+
+  async updatePeerInDB(peer: Peer, value?: Partial<PeerData>): Promise<void> {
+    const peerData = ioRedisServer.hGet(
       getRedisKey['roomPeers'](this.roomId),
+      peer.id
+    );
+    if (!peerData) return;
+    await ioRedisServer.hSet(
+      getRedisKey['roomPeers'](this.roomId),
+      peer.id,
       JSON.stringify({
         ...peer.getData(),
         ...value,
@@ -221,6 +229,19 @@ class Room extends EventEmitter {
   }
 
   async savePeer(peer: Peer): Promise<void> {
+    await ioRedisServer.hSet(
+      getRedisKey['roomPeers'](this.roomId),
+      peer.id,
+      JSON.stringify({
+        ...peer.getData(),
+        online: true,
+      })
+    );
+
+    console.log('Saved Peer');
+  }
+
+  async savePeerD(peer: Peer): Promise<void> {
     const wasSaved = await ioRedisServer.sIsMember(
       getRedisKey['roomPeerIds'](this.roomId),
       peer.id

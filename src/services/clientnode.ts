@@ -134,8 +134,8 @@ class ClientNode extends EventEmitter {
         });
 
       // check if visitor was a participant
-      const wasAParticipant = await ioRedisServer.sIsMember(
-        getRedisKey['roomPeerIds'](roomId),
+      const wasAParticipant = await ioRedisServer.hExists(
+        getRedisKey['roomPeers'](roomId),
         peerId
       );
       const peers = await room.getPeersOnline();
@@ -154,8 +154,8 @@ class ClientNode extends EventEmitter {
       const data = ValidationSchema.roomIdPeerIdPeerData.parse(args);
       const { roomId, peerId, peerData } = data;
 
-      const wasAParticipant = await ioRedisServer.sIsMember(
-        getRedisKey['roomPeerIds'](roomId),
+      const wasAParticipant = await ioRedisServer.hExists(
+        getRedisKey['roomPeers'](roomId),
         peerId
       );
 
@@ -229,10 +229,8 @@ class ClientNode extends EventEmitter {
         peerExistingHere.close();
         console.log('close Peer  existing here');
       } else {
-        const peerExistingElseWhere = (await room.getPeersOnline()).find(
-          peer => peer.id === peerData.id
-        );
-        if (peerExistingElseWhere) {
+        const peerExistingElseWhere = await room.getPeerByIdFromDB(peerData.id);
+        if (peerExistingElseWhere && peerExistingElseWhere?.online) {
           await ioRedisServer.publish({
             channel: getPubSubChannel['room'](roomId),
             action: Actions.RemovePeer,
