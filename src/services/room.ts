@@ -237,7 +237,6 @@ class Room extends EventEmitter {
         online: true,
       })
     );
-    // await ioRedisServer.sAdd(getRedisKey['roomPeerIds'](this.roomId), peer.id);
 
     console.log('Saved Peer');
   }
