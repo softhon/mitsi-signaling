@@ -98,16 +98,16 @@ class Room extends EventEmitter {
       if (activeRoom) {
         roomInstanceData = JSON.parse(activeRoom);
       } else {
-        // get room data from api
+        // Todo Get room data from api
 
-        // use domi data for now
+        // For now use domi data for now
         const roomData: RoomData = {
           id: crypto.randomUUID(),
-          title: 'Hello Room',
+          name: `room-${roomId}`,
           roomId,
           host: {
             id: crypto.randomUUID(),
-            name: 'Favour Grace',
+            name: `host-${roomId}`,
           },
           coHostEmails: [],
           guestEmails: [],

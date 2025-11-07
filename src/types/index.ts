@@ -46,7 +46,7 @@ export interface MessageData {
 
 export interface RoomData {
   id: string;
-  title: string;
+  name: string;
   roomId: string;
   description?: string;
   host: {
