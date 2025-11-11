@@ -153,8 +153,6 @@ class Peer extends Base {
       const data = ValidationSchema.connectWebRtcTransport.parse(args);
       const { dtlsParameters, transportId } = data;
 
-      console.log('ConnectWebrtcTransports', roomId, peerId);
-
       this.medianode.sendMessage(Actions.ConnectWebrtcTransports, {
         peerId,
         roomId,
@@ -172,7 +170,6 @@ class Peer extends Base {
         peerId,
         roomId,
       });
-      console.log(Actions.CreateConsumersOfAllProducers, 'Two');
 
       callback({
         status: 'success',
@@ -183,7 +180,6 @@ class Peer extends Base {
       const { roomId, peerId } = this.connection.data;
       const data = ValidationSchema.createProducer.parse(args);
       const { transportId, kind, rtpParameters, appData } = data;
-      console.log('createProducer', roomId, peerId);
 
       const response = await this.medianode.sendMessageForResponse(
         Actions.CreateProducer,
@@ -196,8 +192,6 @@ class Peer extends Base {
           appData: { peerName: this.data.name, ...appData },
         }
       );
-
-      console.log('createProducer', response);
 
       callback({
         status: 'success',
@@ -393,8 +387,6 @@ class Peer extends Base {
     },
 
     [Actions.Heartbeat]: async (args, callback) => {
-      console.log('Got heart beat', Date.now());
-
       this.updateLastHeartBeat();
       callback({
         status: 'success',

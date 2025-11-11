@@ -309,8 +309,6 @@ class Room extends EventEmitter {
       if (this.closed || !this.isEmpty())
         return console.log('Room self destruct did not continue');
 
-      console.log('Room self destruct called ');
-
       if (this.selfDestructTimeout) clearTimeout(this.selfDestructTimeout);
 
       this.selfDestructTimeout = setTimeout(async () => {
@@ -325,7 +323,6 @@ class Room extends EventEmitter {
 
   private handlePeerEvents(peer: Peer): void {
     peer.on(Actions.Close, ({ silent }) => {
-      console.log('Close Peer:', { silent });
       this.removePeer(peer.id).catch(err => console.log(err));
       if (!silent)
         peer.sendMessage({
@@ -339,7 +336,6 @@ class Room extends EventEmitter {
           broadcast: true,
         });
     });
-    console.log('Register peer events');
   }
 
   private handleEvents(): void {}
