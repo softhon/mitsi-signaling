@@ -262,10 +262,11 @@ class IORedisServer {
     [PSA.MediaNodeAdded]: async args => {
       try {
         const data = ValidationSchema.mediaNodeAdded.parse(args);
+        console.log('MediaNodeAdded ---', data);
         await new MediaNode(data).connect();
       } catch (error) {
         console.error(
-          `Error connecting to MediaNode ${args['id']} at ${args['ip']}:${args['port']}`,
+          `Error connecting to MediaNode ${args['id']} at ${args['ip']}:${args['grpcPort']}`,
           error
         );
       }

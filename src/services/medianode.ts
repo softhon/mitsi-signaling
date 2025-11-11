@@ -499,7 +499,6 @@ class MediaNode extends EventEmitter {
     },
 
     [Actions.ConsumerCreated]: async (args, requestId) => {
-      console.log(args, 'consumer');
       const { peerId, roomId } =
         ValidationSchema.createConsumerData.parse(args);
       const room = Room.getRoom(roomId);
