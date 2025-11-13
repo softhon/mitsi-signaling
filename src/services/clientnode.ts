@@ -75,20 +75,16 @@ class ClientNode extends EventEmitter {
     );
   }
 
-  close(silent?: boolean): void {
-    console.log('closing client node');
-
+  close(): void {
     if (this.closed) return;
     this.closed = true;
 
     // console.log('closing client node');
 
-    this.emit(Actions.Close, { silent });
-    this.connection.disconnect(true);
+    this.emit(Actions.Close);
     ClientNode.clientNodes.delete(this.connectionId);
+    console.log('clientnode Closed -> connectionId', this.connectionId);
     this.removeAllListeners();
-    console.log('clientnode Closed');
-    if (!silent) this.connection.disconnect(true);
   }
 
   private actionHandlers: {

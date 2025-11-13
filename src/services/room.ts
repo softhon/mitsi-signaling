@@ -237,37 +237,6 @@ class Room extends EventEmitter {
         online: true,
       })
     );
-
-    console.log('Saved Peer');
-  }
-
-  async savePeerD(peer: Peer): Promise<void> {
-    const wasSaved = await ioRedisServer.sIsMember(
-      getRedisKey['roomPeerIds'](this.roomId),
-      peer.id
-    );
-    if (wasSaved) {
-      //remove
-      const savedPeers = await this.getPeersFromDB();
-      const foundPeerData = savedPeers.find(value => value.id === peer.id);
-      if (foundPeerData) {
-        await ioRedisServer.sRem(
-          getRedisKey['roomPeers'](this.roomId),
-          JSON.stringify(foundPeerData)
-        );
-      }
-    }
-
-    await ioRedisServer.sAdd(
-      getRedisKey['roomPeers'](this.roomId),
-      JSON.stringify({
-        ...peer.getData(),
-        online: true,
-      })
-    );
-    await ioRedisServer.sAdd(getRedisKey['roomPeerIds'](this.roomId), peer.id);
-
-    console.log('Saved Peer');
   }
 
   async getActiveSpeakerPeerId(): Promise<string | null> {
@@ -323,6 +292,7 @@ class Room extends EventEmitter {
 
   private handlePeerEvents(peer: Peer): void {
     peer.on(Actions.Close, ({ silent }) => {
+      console.log('Room handle Close Peer-', peer.getData().name);
       this.removePeer(peer.id).catch(err => console.log(err));
       if (!silent)
         peer.sendMessage({

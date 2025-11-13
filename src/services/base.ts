@@ -32,8 +32,9 @@ abstract class Base extends EventEmitter {
     if (this.closed) return;
     this.closed = true;
     this.emit(Actions.Close, { silent });
+    if (!silent) this.connection.disconnect(true);
+
     this.removeAllListeners();
-    console.log('Peer', 'Close peer');
   }
 
   sendMessage({
