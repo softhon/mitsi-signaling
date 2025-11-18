@@ -140,3 +140,13 @@ export interface PendingRequest {
   resolve: (response: ResponseData) => void;
   reject: (error: Error) => void;
 }
+
+export interface ChatData {
+  id: string;
+  text: string;
+  sender: PeerData;
+  receiver: PeerData;
+  isFile?: boolean;
+  isPinned?: boolean;
+  createdAt: number;
+}

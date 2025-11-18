@@ -1,10 +1,17 @@
 import EventEmitter from 'events';
 import Peer from './peer';
 import { ioRedisServer } from '../servers/ioredis-server';
-import { PeerData, RoomData, RoomInstanceData } from '../types';
+import {
+  ChatData,
+  MessageData,
+  PeerData,
+  RoomData,
+  RoomInstanceData,
+} from '../types';
 import { getPubSubChannel, getRedisKey } from '../lib/utils';
 import { Actions } from '../types/actions';
 import { ROOM_TIMEOUT } from '../lib/contants';
+import { SocketServer } from '../servers/socket-server';
 
 class Room extends EventEmitter {
   roomId: string;
@@ -259,6 +266,34 @@ class Room extends EventEmitter {
       activeSpeakerPeerId,
       timeLeft: this.timeLeft,
     };
+  }
+
+  async saveChat(chat: ChatData): Promise<void> {
+    await ioRedisServer.hSet(
+      getRedisKey['roomChats'](this.roomId),
+      chat.id,
+      JSON.stringify(chat)
+    );
+  }
+
+  async getChats(): Promise<ChatData[]> {
+    const data = await ioRedisServer.hVals(
+      getRedisKey['roomChats'](this.roomId)
+    );
+    const chats: ChatData[] = [];
+
+    data.forEach(value => {
+      chats.push(JSON.parse(value));
+    });
+
+    return chats;
+  }
+
+  broadcast(messageData: MessageData): void {
+    SocketServer.getInstance()
+      .getIo()
+      .to(getRedisKey['room'](this.roomId))
+      .emit(Actions.Message, messageData);
   }
 
   private handleCountDown(): void {

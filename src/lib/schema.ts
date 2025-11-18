@@ -131,4 +131,12 @@ export const ValidationSchema = {
   mediaNodeRemoved: z.object({
     id: z.string(),
   }),
+
+  sendChat: z.object({
+    id: z.string(),
+    text: z.string(),
+    sender: peerDataSchema,
+    receiver: peerDataSchema,
+    createdAt: z.number(),
+  }),
 };

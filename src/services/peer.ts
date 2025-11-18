@@ -419,7 +419,18 @@ class Peer extends Base {
     },
 
     [Actions.SendChat]: async (args, callback) => {
-      console.log('Send Chat', args);
+      const { roomId } = this.connection.data;
+      const data = ValidationSchema.sendChat.parse(args);
+
+      const room = Room.getRoom(roomId);
+
+      if (room) {
+        room.broadcast({
+          action: Actions.SendChat,
+          args: data,
+        });
+      }
+
       callback({
         status: 'success',
       });
