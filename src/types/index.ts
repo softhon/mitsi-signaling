@@ -104,16 +104,6 @@ export interface AttendeeData {
   joined: number;
 }
 
-export interface ChatData {
-  id: string;
-  text: string;
-  sender: PeerData;
-  receiver: PeerData;
-  isFile?: boolean;
-  isPinned?: boolean;
-  createdAt: number;
-}
-
 export interface MediaNodeData {
   id: string;
   ip: string;
@@ -145,7 +135,7 @@ export interface ChatData {
   id: string;
   text: string;
   sender: PeerData;
-  receiver: PeerData;
+  receiver?: PeerData;
   isFile?: boolean;
   isPinned?: boolean;
   createdAt: number;

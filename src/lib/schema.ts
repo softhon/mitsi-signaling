@@ -136,7 +136,7 @@ export const ValidationSchema = {
     id: z.string(),
     text: z.string(),
     sender: peerDataSchema,
-    receiver: peerDataSchema,
+    receiver: peerDataSchema.optional(),
     createdAt: z.number(),
   }),
 };
