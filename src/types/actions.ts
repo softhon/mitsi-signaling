@@ -51,7 +51,7 @@ export enum Actions {
   AddRole = 'add_role',
   RemoveRole = 'remove_role',
 
-  EndMeeting = 'end_meeting',
+  EndRoom = 'end_room',
 
   Heartbeat = 'heartbeat',
   HeartbeatAck = 'heartbeat_ack',

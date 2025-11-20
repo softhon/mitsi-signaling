@@ -1,10 +1,17 @@
 import EventEmitter from 'events';
 import Peer from './peer';
 import { ioRedisServer } from '../servers/ioredis-server';
-import { PeerData, RoomData, RoomInstanceData } from '../types';
+import {
+  ChatData,
+  MessageData,
+  PeerData,
+  RoomData,
+  RoomInstanceData,
+} from '../types';
 import { getPubSubChannel, getRedisKey } from '../lib/utils';
 import { Actions } from '../types/actions';
 import { ROOM_TIMEOUT } from '../lib/contants';
+import { SocketServer } from '../servers/socket-server';
 
 class Room extends EventEmitter {
   roomId: string;
@@ -73,7 +80,7 @@ class Room extends EventEmitter {
 
   async close(end?: boolean): Promise<void> {
     if (this.closed) return;
-    if (end) console.log('End meeting');
+    if (end) this.emit(Actions.EndRoom);
 
     for (const peer of this.peers.values()) {
       peer.close();
@@ -261,8 +268,36 @@ class Room extends EventEmitter {
     };
   }
 
+  async saveChat(chat: ChatData): Promise<void> {
+    await ioRedisServer.hSet(
+      getRedisKey['roomChats'](this.roomId),
+      chat.id,
+      JSON.stringify(chat)
+    );
+  }
+
+  async getChats(): Promise<ChatData[]> {
+    const data = await ioRedisServer.hVals(
+      getRedisKey['roomChats'](this.roomId)
+    );
+    const chats: ChatData[] = [];
+
+    data.forEach(value => {
+      chats.push(JSON.parse(value));
+    });
+
+    return chats;
+  }
+
+  broadcast(messageData: MessageData, room?: string): void {
+    SocketServer.getInstance()
+      .getIo()
+      .to(room || getRedisKey['room'](this.roomId))
+      .emit(Actions.Message, messageData);
+  }
+
   private handleCountDown(): void {
-    console.log(this.timeLeft);
+    console.log('time- out', this.timeLeft);
     if (this.endCountDownInterval) clearInterval(this.endCountDownInterval);
     this.endCountDownInterval = setInterval(() => {
       this.timeLeft -= 1;
@@ -308,7 +343,45 @@ class Room extends EventEmitter {
     });
   }
 
-  private handleEvents(): void {}
+  private handleEvents(): void {
+    this.on(Actions.EndRoom, () => {
+      console.log('handle end room');
+      //notify visitors/waiter end room
+      this.broadcast(
+        {
+          action: Actions.EndRoom,
+          args: {},
+        },
+        getRedisKey['lobby'](this.roomId)
+      );
+
+      ioRedisServer.publish({
+        channel: getPubSubChannel['room'](this.roomId),
+        action: Actions.EndRoom,
+        args: {
+          roomId: this.roomId,
+        },
+      });
+      //clear redis memory
+      console.log('clear redis memoryu');
+      ioRedisServer
+        .del(getRedisKey['roomPeers'](this.roomId))
+        .then(value => console.log('Deleted roomPeers', value))
+        .catch(reason =>
+          console.log('delete roomPeers failed reaon -> ', reason)
+        );
+      ioRedisServer
+        .del(getRedisKey['room'](this.roomId))
+        .then(value => console.log('Deleted room', value))
+        .catch(reason => console.log('delete room failed reaon -> ', reason));
+      ioRedisServer
+        .del(getRedisKey['roomActiveSpeakerPeerId'](this.roomId))
+        .then(value => console.log('Deleted roomActiveSpeakerPeerId', value))
+        .catch(reason =>
+          console.log('delete roomActiveSpeakerPeerId failed reaon -> ', reason)
+        );
+    });
+  }
 }
 
 export default Room;

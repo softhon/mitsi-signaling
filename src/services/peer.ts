@@ -419,7 +419,14 @@ class Peer extends Base {
     },
 
     [Actions.SendChat]: async (args, callback) => {
-      console.log('Send Chat', args);
+      const data = ValidationSchema.sendChat.parse(args);
+      this.sendMessage({
+        message: {
+          action: Actions.SendChat,
+          args: data,
+        },
+        broadcast: true,
+      });
       callback({
         status: 'success',
       });
@@ -446,7 +453,7 @@ class Peer extends Base {
       });
     },
 
-    [Actions.EndMeeting]: async (args, callback) => {
+    [Actions.EndRoom]: async (args, callback) => {
       console.log('EndMeeting', args);
 
       callback({

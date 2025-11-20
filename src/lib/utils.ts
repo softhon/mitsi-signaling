@@ -10,6 +10,7 @@ export const getRedisKey = {
   roomPeerIds: (roomId: string): string => `room:${roomId}:peerids`,
   roomActiveSpeakerPeerId: (roomId: string): string =>
     `room:${roomId}:activespeakerpeerid`,
+  roomChats: (roomId: string): string => `room:${roomId}:chats`,
   rooms: (): string => `rooms`,
   medianodes: (): string => `medianodes`,
   signalnodes: (): string => `signalnodes`,
