@@ -453,7 +453,7 @@ class Peer extends Base {
       });
     },
 
-    [Actions.EndMeeting]: async (args, callback) => {
+    [Actions.EndRoom]: async (args, callback) => {
       console.log('EndMeeting', args);
 
       callback({
