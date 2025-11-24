@@ -12,7 +12,7 @@ import {
 } from '../types';
 import { Actions } from '../types/actions';
 import MediaNode from './medianode';
-import { getPubSubChannel } from '../lib/utils';
+import { getPubSubChannel, getRedisKey } from '../lib/utils';
 import { ValidationSchema } from '../lib/schema';
 import { ioRedisServer } from '../servers/ioredis-server';
 import Room from './room';
@@ -99,6 +99,45 @@ class Peer extends Base {
   }
   cleanUp(): void {
     clearInterval(this.heartBeatInterval);
+  }
+
+  async updateDB(value?: Partial<PeerData>): Promise<void> {
+    const peerData = ioRedisServer.hGet(
+      getRedisKey['roomPeers'](this.roomId),
+      this.id
+    );
+    if (!peerData) return;
+    await ioRedisServer.hSet(
+      getRedisKey['roomPeers'](this.roomId),
+      this.id,
+      JSON.stringify({
+        ...this.getData(),
+        ...value,
+      })
+    );
+  }
+
+  async handleHand(raised: boolean): Promise<void> {
+    const state: HandState = {
+      raised,
+      timestamp: raised ? Date.now() : undefined,
+    };
+    this.hand = state;
+
+    this.sendMessage({
+      message: {
+        action: Actions.RaiseHand,
+        args: {
+          peer: {
+            id: this.id,
+            name: this.data.name,
+          },
+          hand: state,
+        },
+      },
+      broadcast: true,
+    });
+    await this.updateDB({ hand: state });
   }
 
   handleConnection(): void {
@@ -394,7 +433,8 @@ class Peer extends Base {
     },
 
     [Actions.RaiseHand]: async (args, callback) => {
-      // set hand
+      const data = ValidationSchema.raiseHand.parse(args);
+      await this.handleHand(data.raised);
       callback({
         status: 'success',
       });
@@ -433,7 +473,15 @@ class Peer extends Base {
     },
 
     [Actions.SendReaction]: async (args, callback) => {
-      console.log('Send Reaction', args);
+      const data = ValidationSchema.sendReaction.parse(args);
+
+      this.sendMessage({
+        message: {
+          action: Actions.SendReaction,
+          args: data,
+        },
+        broadcast: true,
+      });
 
       callback({
         status: 'success',
