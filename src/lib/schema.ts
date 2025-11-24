@@ -146,4 +146,8 @@ export const ValidationSchema = {
     position: z.string(),
     timestamp: z.number(),
   }),
+
+  raiseHand: z.object({
+    raised: z.boolean(),
+  }),
 };
