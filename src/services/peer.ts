@@ -433,7 +433,15 @@ class Peer extends Base {
     },
 
     [Actions.SendReaction]: async (args, callback) => {
-      console.log('Send Reaction', args);
+      const data = ValidationSchema.sendReaction.parse(args);
+
+      this.sendMessage({
+        message: {
+          action: Actions.SendReaction,
+          args: data,
+        },
+        broadcast: true,
+      });
 
       callback({
         status: 'success',
