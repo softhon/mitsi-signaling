@@ -502,8 +502,9 @@ class Peer extends Base {
     },
 
     [Actions.EndRoom]: async (args, callback) => {
-      console.log('EndMeeting', args);
-
+      const { roomId } = this.connection.data;
+      const room = Room.getRoom(roomId);
+      room?.close(true);
       callback({
         status: 'success',
       });
