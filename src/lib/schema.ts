@@ -123,6 +123,14 @@ export const ValidationSchema = {
     source: producerSource,
   }),
 
+  setConsumerPreferredLayers: z.object({
+    consumerId: z.string(),
+    producerPeerId: z.string(),
+    producerSource: producerSource,
+    spatialLayer: z.number(),
+    temporalLayer: z.number().optional(),
+  }),
+
   mediaNodeAdded: z.object({
     id: z.string(),
     ip: z.string(),

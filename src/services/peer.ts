@@ -323,6 +323,33 @@ class Peer extends Base {
       });
     },
 
+    [Actions.SetConsumerPreferredLayers]: async (args, callback) => {
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.setConsumerPreferredLayers.parse(args);
+      const {
+        consumerId,
+        producerPeerId,
+        producerSource,
+        spatialLayer,
+        temporalLayer,
+      } = data;
+
+      // Forward to MediaNode to execute setPreferredLayers on the consumer
+      this.medianode.sendMessage(Actions.SetConsumerPreferredLayers, {
+        peerId,
+        roomId,
+        consumerId,
+        producerPeerId,
+        producerSource,
+        spatialLayer,
+        temporalLayer: temporalLayer ?? spatialLayer, // Default temporal to spatial if not specified
+      });
+
+      callback({
+        status: 'success',
+      });
+    },
+
     [Actions.Mute]: async (args, callback) => {
       const { roomId } = this.connection.data;
       const data = ValidationSchema.peerIds.parse(args);
