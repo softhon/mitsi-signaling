@@ -66,7 +66,6 @@ class Peer extends Base {
 
     this.heartBeatInterval = setInterval(() => {
       if (Date.now() - this.lastHeartbeat > HEARTBEAT_TIMEOUT) {
-        console.warn(`Peer ${this.id} heartbeat timeout, closing`);
         this.close();
       }
     }, HEARTBEAT_INTERVAL);
@@ -89,6 +88,7 @@ class Peer extends Base {
     };
   }
   updateLastHeartBeat(): void {
+    console.log(`Peer ${this.id} heartbeat received`);
     this.lastHeartbeat = Date.now();
   }
 
