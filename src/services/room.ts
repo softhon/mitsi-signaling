@@ -126,7 +126,9 @@ class Room extends EventEmitter {
           hostId: roomData.host.id,
           coHostEmails: roomData.coHostEmails,
           started: Date.now(),
-          maxPeers: 50,
+          maxPeers: process.env.MAX_PEERS_PER_ROOM
+            ? parseInt(process.env.MAX_PEERS_PER_ROOM)
+            : 500, // Default 500, configurable via env
           maxDuration: 60, // minutes
           allowRecording: false,
           allowWaiting: false,

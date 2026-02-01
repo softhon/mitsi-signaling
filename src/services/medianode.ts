@@ -53,6 +53,7 @@ class MediaNode extends EventEmitter {
   // implemented to get immediate response to request/stream
   private pendingRequests: Map<string, PendingRequest>;
   private static mediaNodes = new Map<string, MediaNode>();
+  private static roundRobinIndex = 0;
 
   constructor({
     id,
@@ -214,8 +215,13 @@ class MediaNode extends EventEmitter {
   // Consider storing server metrics in redis and not instances
   static getleastLoadedNode(): MediaNode | null {
     const nodes = Array.from(MediaNode.mediaNodes.values());
-    if (nodes.length) return nodes[0];
-    return null;
+    if (nodes.length === 0) return null;
+
+    // Round-robin distribution across available nodes
+    const selectedNode = nodes[MediaNode.roundRobinIndex % nodes.length];
+    MediaNode.roundRobinIndex = (MediaNode.roundRobinIndex + 1) % nodes.length;
+
+    return selectedNode;
   }
 
   private cleanup(): void {
@@ -348,6 +354,15 @@ class MediaNode extends EventEmitter {
       throw `Cannot send message to MediaNode ${this.id}: not connected`;
     }
 
+    // Check queue size to prevent memory exhaustion
+    if (this.pendingRequests.size >= this.maxQueueSize) {
+      return Promise.reject(
+        new Error(
+          `Pending request queue full (${this.maxQueueSize}). MediaNode ${this.id} may be overloaded.`
+        )
+      );
+    }
+
     const requestId = crypto.randomUUID();
 
     const message: MessageRequest = {
@@ -358,10 +373,25 @@ class MediaNode extends EventEmitter {
 
     return new Promise<ResponseData>((resolve, reject) => {
       if (this.grpcCall) {
+        // Set timeout to prevent orphaned requests
+        const timeout = setTimeout(() => {
+          const pendingRequest = this.pendingRequests.get(requestId);
+          if (pendingRequest) {
+            this.pendingRequests.delete(requestId);
+            reject(
+              new Error(
+                `Request timeout after ${this.messageTimeout}ms for action ${action} to MediaNode ${this.id}`
+              )
+            );
+          }
+        }, this.messageTimeout);
+
         this.pendingRequests.set(requestId, {
           resolve,
           reject,
-        }); // save resolve
+          timeout,
+        });
+
         this.grpcCall.write(message);
       }
     });
@@ -459,6 +489,11 @@ class MediaNode extends EventEmitter {
     if (requestId?.length) {
       const pendingRequest = this.pendingRequests.get(requestId);
       if (pendingRequest) {
+        // Clear timeout if it exists
+        if (pendingRequest.timeout) {
+          clearTimeout(pendingRequest.timeout);
+        }
+
         if (parsedArgs.status === 'error') {
           pendingRequest.reject(parsedArgs.error as Error);
         } else {

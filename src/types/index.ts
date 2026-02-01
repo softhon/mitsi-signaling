@@ -129,6 +129,7 @@ export interface SignalnodeData {
 export interface PendingRequest {
   resolve: (response: ResponseData) => void;
   reject: (error: Error) => void;
+  timeout?: NodeJS.Timeout;
 }
 
 export interface ChatData {

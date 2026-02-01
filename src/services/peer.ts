@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 
 import Base from './base';
-import { HEARTBEAT_TIMEOUT } from '../lib/contants';
+import { HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL } from '../lib/contants';
 import {
   AckCallback,
   HandState,
@@ -66,10 +66,10 @@ class Peer extends Base {
 
     this.heartBeatInterval = setInterval(() => {
       if (Date.now() - this.lastHeartbeat > HEARTBEAT_TIMEOUT) {
-        console.log('Peer heart beat failed --- closing peer');
+        console.warn(`Peer ${this.id} heartbeat timeout, closing`);
         this.close();
       }
-    }, HEARTBEAT_TIMEOUT);
+    }, HEARTBEAT_INTERVAL);
     this.handleEvents();
     this.handleConnection();
   }
@@ -366,9 +366,8 @@ class Peer extends Base {
       const room = Room.getRoom(roomId);
 
       if (room) {
-        const peers = room.getPeers();
         peerIds.forEach(id => {
-          const peer = peers.find(peer => id === peer.id);
+          const peer = room.getPeer(id); // O(1) lookup instead of O(n)
           if (peer)
             peer.sendMessage({
               message: {
@@ -400,9 +399,8 @@ class Peer extends Base {
       const room = Room.getRoom(roomId);
 
       if (room) {
-        const peers = room.getPeers();
         peerIds.forEach(id => {
-          const peer = peers.find(peer => id === peer.id);
+          const peer = room.getPeer(id); // O(1) lookup instead of O(n)
           if (peer)
             peer.sendMessage({
               message: {
@@ -434,9 +432,8 @@ class Peer extends Base {
       const room = Room.getRoom(roomId);
 
       if (room) {
-        const peers = room.getPeers();
         peerIds.forEach(id => {
-          const peer = peers.find(peer => id === peer.id);
+          const peer = room.getPeer(id); // O(1) lookup instead of O(n)
           if (peer)
             peer.sendMessage({
               message: {
