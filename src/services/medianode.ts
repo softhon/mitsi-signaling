@@ -44,6 +44,10 @@ class MediaNode extends EventEmitter {
   private connectionTimeout: NodeJS.Timeout | null;
   private circuitBreakerTimer: NodeJS.Timeout | null;
 
+  private reconnectAttempts: number = 0;
+  private isReconnecting: boolean = false;
+  private lastHeartbeatAck: number = Date.now();
+
   private readonly clientId: string;
   private readonly connectionId: string;
 
@@ -177,6 +181,10 @@ class MediaNode extends EventEmitter {
       this.connectionTimeout = null;
     }
 
+    // Reset reconnection state on successful connect
+    this.reconnectAttempts = 0;
+    this.isReconnecting = false;
+
     // store instance
     MediaNode.mediaNodes.set(this.id, this);
 
@@ -188,6 +196,9 @@ class MediaNode extends EventEmitter {
       timestamp: Date.now(),
       message: 'Successfully connected to Media Signaling Server',
     });
+
+    // Start health-check heartbeat
+    this.setupHealthCheck();
 
     console.log(
       `Successfully ${isExistingNode ? 'reconnected' : 'connected'} to MediaNode ${this.id} at ${this.ip}:${this.grpcPort}`
@@ -276,7 +287,14 @@ class MediaNode extends EventEmitter {
     // Create gRPC client with proper options
     this.grpcClient = new protoDescriptor.mediaSignalingPackage.MediaSignaling(
       `${this.ip}:${this.grpcPort}`,
-      grpc.credentials.createInsecure()
+      grpc.credentials.createInsecure(),
+      {
+        'grpc.keepalive_time_ms': 30000,
+        'grpc.keepalive_timeout_ms': 10000,
+        'grpc.keepalive_permit_without_calls': 1,
+        'grpc.http2.min_time_between_pings_ms': 30000,
+        'grpc.http2.max_pings_without_data': 0,
+      }
     );
 
     // Wait for client to be ready
@@ -409,26 +427,90 @@ class MediaNode extends EventEmitter {
       this.handleIncomingMessage(message);
     });
 
-    // Handle connection events
+    // Handle connection events — all trigger reconnection
     this.grpcCall.on('end', () => {
       console.log(`MediaNode ${this.id} ended the connection`);
+      this.handleStreamDisconnect('stream_ended');
     });
 
     this.grpcCall.on('error', (error: Error) => {
       console.error(`Stream error for MediaNode ${this.id}:`, error);
+      this.handleStreamDisconnect('stream_error');
     });
 
     this.grpcCall.on('close', () => {
       console.log(`Stream closed for MediaNode ${this.id}`);
+      this.handleStreamDisconnect('stream_closed');
     });
 
     this.grpcCall.on('cancelled', () => {
       console.log(`Stream cancelled for MediaNode ${this.id}`);
+      this.handleStreamDisconnect('stream_cancelled');
     });
+  }
+
+  private handleStreamDisconnect(reason: string): void {
+    if (this.isReconnecting) return;
+    console.warn(
+      `MediaNode ${this.id} disconnected: ${reason} — scheduling reconnect`
+    );
+    this.cleanup();
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) return;
+    this.isReconnecting = true;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    console.log(
+      `Reconnecting to MediaNode ${this.id} in ${delay}ms (attempt ${this.reconnectAttempts + 1})`
+    );
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      try {
+        await this.connect();
+        console.log(`MediaNode ${this.id} reconnected successfully`);
+      } catch (error) {
+        console.error(
+          `Reconnect attempt ${this.reconnectAttempts + 1} failed for MediaNode ${this.id}:`,
+          error
+        );
+        this.reconnectAttempts++;
+        this.scheduleReconnect();
+      }
+    }, delay);
+  }
+
+  private setupHealthCheck(): void {
+    if (this.healthCheckTimer) clearInterval(this.healthCheckTimer);
+    this.lastHeartbeatAck = Date.now();
+    this.healthCheckTimer = setInterval(() => {
+      if (!this.grpcCall) return;
+      const staleness = Date.now() - this.lastHeartbeatAck;
+      if (staleness > 60000) {
+        console.warn(
+          `MediaNode ${this.id} heartbeat timeout (${staleness}ms) — reconnecting`
+        );
+        this.handleStreamDisconnect('heartbeat_timeout');
+        return;
+      }
+      try {
+        this.sendMessage(Actions.Heartbeat, {
+          timestamp: Date.now(),
+          connectionId: this.connectionId,
+        });
+      } catch (error) {
+        console.warn(
+          `Failed to send heartbeat to MediaNode ${this.id}:`,
+          error
+        );
+      }
+    }, 30000);
   }
 
   private handleHeartbeat(args: { [key: string]: unknown }): void {
     console.log(args);
+    this.lastHeartbeatAck = Date.now();
     // Respond to heartbeat
     this.sendMessage(Actions.HeartbeatAck, {
       timestamp: Date.now(),
@@ -531,6 +613,10 @@ class MediaNode extends EventEmitter {
 
     [Actions.Heartbeat]: async args => {
       this.handleHeartbeat(args);
+    },
+
+    [Actions.HeartbeatAck]: async () => {
+      this.lastHeartbeatAck = Date.now();
     },
 
     [Actions.ConsumerCreated]: async (args, requestId) => {
