@@ -1,15 +1,13 @@
 # Multi-stage Dockerfile for a Node.js signaling server
-FROM node:24-alpine AS build
+FROM node:24-slim AS build
 
-# Install build dependencies for mediasoup (Python 3, pip, C++ tools, and kernel headers)
-RUN apk add --no-cache \
+# Install build dependencies for mediasoup (Python 3, pip, C++ tools)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    py3-pip \
+    python3-pip \
     make \
     g++ \
-    gcc \
-    linux-headers && \
-    ln -sf python3 /usr/bin/python
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 
@@ -24,16 +22,7 @@ COPY ./src/protos ./dist/protos
 RUN npm prune --omit=dev
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM node:24-alpine AS runtime
-
-# mediasoup native bindings require these libs to load under musl at runtime
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++ \
-    gcc \
-    linux-headers && \
-    ln -sf python3 /usr/bin/python
+FROM node:24-slim AS runtime
 
 WORKDIR /usr/src/app
 
