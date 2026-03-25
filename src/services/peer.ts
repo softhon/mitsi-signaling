@@ -1,7 +1,7 @@
 import { Socket } from 'socket.io';
 
 import Base from './base';
-import { HEARTBEAT_TIMEOUT } from '../lib/contants';
+import { HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL } from '../lib/contants';
 import {
   AckCallback,
   HandState,
@@ -66,10 +66,9 @@ class Peer extends Base {
 
     this.heartBeatInterval = setInterval(() => {
       if (Date.now() - this.lastHeartbeat > HEARTBEAT_TIMEOUT) {
-        console.log('Peer heart beat failed --- closing peer');
         this.close();
       }
-    }, HEARTBEAT_TIMEOUT);
+    }, HEARTBEAT_INTERVAL);
     this.handleEvents();
     this.handleConnection();
   }
@@ -89,6 +88,7 @@ class Peer extends Base {
     };
   }
   updateLastHeartBeat(): void {
+    console.log(`Peer ${this.id} heartbeat received`);
     this.lastHeartbeat = Date.now();
   }
 
@@ -323,6 +323,33 @@ class Peer extends Base {
       });
     },
 
+    [Actions.SetConsumerPreferredLayers]: async (args, callback) => {
+      const { roomId, peerId } = this.connection.data;
+      const data = ValidationSchema.setConsumerPreferredLayers.parse(args);
+      const {
+        consumerId,
+        producerPeerId,
+        producerSource,
+        spatialLayer,
+        temporalLayer,
+      } = data;
+
+      // Forward to MediaNode to execute setPreferredLayers on the consumer
+      this.medianode.sendMessage(Actions.SetConsumerPreferredLayers, {
+        peerId,
+        roomId,
+        consumerId,
+        producerPeerId,
+        producerSource,
+        spatialLayer,
+        temporalLayer: temporalLayer ?? spatialLayer, // Default temporal to spatial if not specified
+      });
+
+      callback({
+        status: 'success',
+      });
+    },
+
     [Actions.Mute]: async (args, callback) => {
       const { roomId } = this.connection.data;
       const data = ValidationSchema.peerIds.parse(args);
@@ -339,9 +366,8 @@ class Peer extends Base {
       const room = Room.getRoom(roomId);
 
       if (room) {
-        const peers = room.getPeers();
         peerIds.forEach(id => {
-          const peer = peers.find(peer => id === peer.id);
+          const peer = room.getPeer(id); // O(1) lookup instead of O(n)
           if (peer)
             peer.sendMessage({
               message: {
@@ -373,9 +399,8 @@ class Peer extends Base {
       const room = Room.getRoom(roomId);
 
       if (room) {
-        const peers = room.getPeers();
         peerIds.forEach(id => {
-          const peer = peers.find(peer => id === peer.id);
+          const peer = room.getPeer(id); // O(1) lookup instead of O(n)
           if (peer)
             peer.sendMessage({
               message: {
@@ -407,9 +432,8 @@ class Peer extends Base {
       const room = Room.getRoom(roomId);
 
       if (room) {
-        const peers = room.getPeers();
         peerIds.forEach(id => {
-          const peer = peers.find(peer => id === peer.id);
+          const peer = room.getPeer(id); // O(1) lookup instead of O(n)
           if (peer)
             peer.sendMessage({
               message: {
